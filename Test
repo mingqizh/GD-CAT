@@ -1,0 +1,391 @@
+library(shiny)
+library(shinyWidgets)
+library(reticulate)
+library(Rcpp)
+library(Seurat)
+library(reshape2)
+library(colormap)
+library(bnlearn)
+library(bnstruct)
+library(patchwork)
+library(dplyr)
+library(limma)
+library(MetBrewer)
+library(qgraph)
+library(devtools)
+library(ADAPTS)
+library(preprocessCore)
+library(pheatmap)
+library(ggplot2)
+library(WGCNA)
+library(mclust)
+library(pheatmap)
+library(qvalue)
+ui<-fluidPage(
+  tags$h1("Welcome to the GTEx Shiny App!"),
+  br(),
+  sidebarLayout(
+    sidebarPanel(
+      radioButtons(
+        inputId = "specie",
+        label = "Chose a specie",
+        choices = c("Human","Mouse")
+      )
+    ),
+    mainPanel(verbatimTextOutput("specie"))
+  ),
+  br(),
+  sidebarLayout(
+    sidebarPanel(
+      radioButtons(
+        "Gender", "Chose gender",c("Male", "Female", "Both")
+      )
+    ),
+    mainPanel(verbatimTextOutput("gender"))
+  ),
+  br(),
+  sidebarLayout(
+    sidebarPanel(
+      fileInput("file1", "Choose GTEx File", accept =".txt"),
+      checkboxInput("header", "Header", TRUE)
+    ),
+    mainPanel(tableOutput("contents"))
+  ),
+  br(),
+  tags$h2("Let's see the pie"),
+  br(),
+  sidebarLayout(
+    actionBttn(
+      inputId = "bttn1",
+      label = "Crosstissue now!",
+      color = "primary",
+      style = "bordered"
+    ),
+    plotOutput("res_bttn1")
+  ),
+  br(),
+  selectInput(
+    "Tissue",
+    "Select a tissue",
+    c(Adipose_Subcutaneous="Adipose – Subcutaneous",
+      Adipose_Visceral = "Adipose - Visceral (Omentum)", 
+      Adrenal_Gland = "Adrenal Gland", 
+      Artery_Aorta = "Artery – Aorta", 
+      Artery_Coronary = "Artery – Coronary", 
+      Brain_Hippocampus = "Brain – Hippocampus", 
+      Brain_Hypothalamus = "Brain – Hypothalamus", 
+      Colon_Transverse = "Colon – Transverse", 
+      Colon_Sigmoid = "Colon – Sigmoid", 
+      Heart_Left_Ventricle = "Heart - Left Ventricle", 
+      Kidney_Cortex = "Kidney – Cortex", 
+      Liver = "Liver", 
+      Lung = "Lung", 
+      Muscle_Skeletal = "Muscle – Skeletal", 
+      Spleen = "Spleen", 
+      Small_Intestine_Terminal_Ileum = "Small Intestine - Terminal Ileum", 
+      Stomach = "Stomach", 
+      Thyroid = "Thyroid", 
+      Pancreas = "Pancreas", 
+      Pituitary = "Pituitary")
+  ),
+  br(),
+  tags$h2("Cross tissue"),
+  tableOutput("et"),
+  plotOutput("egew"),
+  br(),
+  tags$h2("Within tissue"),
+  tableOutput("wef"),
+  plotOutput("wefe"),
+  br(),
+  tags$h2("Pathways"),
+  selectInput(
+    "network",
+    "Select the network",
+    c(Undirected_network="Undirected network", 
+      Directed_network ="Directed network")
+  ),
+  plotOutput("plot3"),
+  plotOutput("plot4"),
+  plotOutput("plot5"),
+  
+)
+
+server<-function(input, output){
+  output$specie <- renderPrint({
+    input$specie
+  })
+  output$gender <- renderPrint({
+    input$Gender
+  })
+  output$contents<-renderTable({
+    file<-input$file1
+    ext<-tools::file_ext(file$datapath)
+    
+    validate(need(ext == c("txt"), "Please upload a txt file"))
+    
+    a<-read.table(file$datapath, header = TRUE,  sep = "\t", fileEncoding = 'utf-8' )
+    head(a)
+  })
+  output$contents<-renderTable({
+    file<-input$file1
+    ext<-tools::file_ext(file$datapath)
+    
+    validate(need(ext == c("txt"), "Please upload a txt file"))
+    
+    a<-read.table(file$datapath, header = TRUE,  sep = "\t", fileEncoding = 'utf-8' )
+    head(a)
+  })
+  output$gene_symbol <- renderPrint({
+    input$gene_symbol
+  })
+  output$origin <- renderPrint({
+    input$origin
+  })
+  output$tissue <- renderPrint({
+    input$tissue
+  })
+  origin_tissue<-reactive({
+    gene_symbol = input$gene_symbol
+    origin_tissue = paste(input$origin, '-', input$tissue)
+    origin_tissue 
+  })
+  working_dataset<-reactive({
+    file<-input$file1
+    ext<-tools::file_ext(file$datapath)
+    working_dataset<-read.table(file$datapath, header = TRUE,  sep = "\t", fileEncoding = 'utf-8' )
+    a<-working_dataset$gene_tissue
+    working_dataset$gene_tissue=NULL
+    working_dataset = as.data.frame(t(working_dataset))
+    colnames(working_dataset)<-a
+    targets <- working_dataset[,grepl('Adipose - Subcutaneous', colnames(working_dataset))
+                               | grepl('Adipose - Visceral (Omentum)', colnames(working_dataset), fixed=T)
+                               | grepl('Brain - Hypothalamus', colnames(working_dataset), fixed=T)
+                               | grepl('Colon - Transverse', colnames(working_dataset), fixed=T)
+                               | grepl('Spleen', colnames(working_dataset), fixed=T)
+                               | grepl('Small Intestine - Terminal Ileum', colnames(working_dataset), fixed=T)
+                               | grepl('Artery - Coronary', colnames(working_dataset), fixed=T)
+                               | grepl('Stomach', colnames(working_dataset), fixed=T)
+                               | grepl('Thyroid', colnames(working_dataset), fixed=T)
+                               | grepl('Pancreas', colnames(working_dataset), fixed=T)
+                               | grepl('Muscle - Skeletal', colnames(working_dataset), fixed=T)
+                               | grepl('Pituitary', colnames(working_dataset), fixed=T)
+                               | grepl('Liver', colnames(working_dataset), fixed=T)
+                               | grepl('Kidney - Cortex', colnames(working_dataset), fixed=T)
+                               | grepl('Heart - Left Ventricle', colnames(working_dataset), fixed=T)
+                               | grepl('Colon - Sigmoid', colnames(working_dataset), fixed=T)
+                               | grepl('Adrenal Gland', colnames(working_dataset), fixed=T) 
+                               | grepl('Artery - Aorta', colnames(working_dataset), fixed=T)
+                               | grepl('Brain - Hippocampus', colnames(working_dataset), fixed=T)
+                               | grepl('Artery - Aorta', colnames(working_dataset), fixed=T)
+                               | grepl('Lung', colnames(working_dataset), fixed=T)]
+    targets = as.data.frame(targets)
+    targets
+  })
+  new_table <- reactive({
+    # read file and reshape it
+    targets = working_dataset()
+    gene_tissue = paste0(input$gene_symbol, '_', input$origin, '-', input$tissue)
+    gene_symbol = input$gene_symbol
+    origin_tissue = paste(input$origin, '-', input$tissue)
+    
+    tissue_set = unique(gsub(".*_","",targets$gene_tissue))
+    new_cols = met.brewer('Moreau', length(tissue_set))
+    names(new_cols) = unique(tissue_set)
+    
+    origin = working_dataset[,colnames(working_dataset) %in% gene_tissue]
+    
+    
+    full_cors = bicorAndPvalue(origin, targets, use = 'p')
+    
+    cor_table = reshape2::melt(full_cors$bicor)
+    
+    cor_table$Var1=NULL
+    colnames(cor_table) = c('gene_tissue', 'bicor')
+    new_p = reshape2::melt(full_cors$p)
+  
+    cor_table$pvalue = new_p$value[match(cor_table$gene_tissue, new_p$Var2)]
+    cor_table = na.omit(cor_table)
+    qest = qvalue(cor_table$pvalue)
+    cor_table$qvalue = qest$qvalues
+    cor_table$gene_symbol = gsub("\\_.*","",cor_table$gene_tissue)
+    cor_table$tissue = gsub(".*_","",cor_table$gene_tissue)
+    cor_table = cor_table[!is.na(cor_table$tissue),]
+    cor_table = cor_table[order(cor_table$pvalue, decreasing = F),]
+    
+    if(input$crosstissue_cors=="q val Less 0.1"){
+      new_table = cor_table[cor_table$qvalue<0.1,]
+    }else if(input$crosstissue_cors=="q val Less 0.01"){
+      new_table = cor_table[cor_table$qvalue<0.01,]
+    }else{
+      new_table = cor_table[cor_table$qvalue<0.001,]
+    }
+    
+    res1 = cor_table[cor_table$pvalue<0.01,]
+    res1 = na.omit(res1)
+    rest1
+  })
+  output$res_buttn1<-renderTable({
+    new_table<-new_table()
+    head(new_table)
+  })
+  output$res_bttn1 = renderPlot({
+    cor_table<-new_table()
+    sig_table = cor_table[cor_table$qvalue<0.1,]
+    sig_table$qcat =ifelse(sig_table$qvalue<0.01, 'q<0.01', 'q<0.1')
+    sig_table$qcat =ifelse(sig_table$qvalue<0.0001, 'q<0.0001', paste0(sig_table$qcat))
+    table(sig_table$tissue[sig_table$qcat=='q<0.01'])
+    
+    blank_theme <- theme_minimal()+
+      theme(
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        panel.border = element_blank(),
+        panel.grid=element_blank(),
+        axis.ticks = element_blank(),
+        plot.title=element_text(size=25, face="bold")
+      )
+    
+    binned_sig_prots= sig_table %>%
+      dplyr::group_by(qcat, tissue) %>%
+      dplyr::summarise(n = n()) %>%
+      dplyr::mutate(freq = n / sum(n))
+    
+    
+    ggplot(binned_sig_prots, aes(x = "", y = freq, fill =tissue)) + 
+      geom_bar(stat = "identity", width = 1, position = position_fill()) + blank_theme + theme(plot.title=element_text(size=25, face="bold")) +
+      theme(axis.text.x=element_blank())+ scale_fill_manual(values=met.brewer('Moreau', length(unique(sig_table$tissue)))) +
+      coord_polar(theta = "y") + 
+      facet_wrap( ~ qcat)
+  })
+  
+  #now remove origin
+  cor_table<-reactive({
+    targets<-working_dataset()
+    targets2 = targets[,!grepl(origin_tissue, colnames(targets))]
+    full_cors = bicorAndPvalue(origin, targets2, use = 'p')
+    
+    cor_table = reshape2::melt(full_cors$bicor)
+    
+    cor_table$Var1=NULL
+    colnames(cor_table) = c('gene_tissue', 'bicor')
+    new_p = reshape2::melt(full_cors$p)
+    cor_table$pvalue = new_p$value[match(cor_table$gene_tissue, new_p$Var2)]
+    cor_table = na.omit(cor_table)
+    qest = qvalue(cor_table$pvalue)
+    cor_table$qvalue = qest$qvalues
+    cor_table$gene_symbol = gsub("\\_.*","",cor_table$gene_tissue)
+    cor_table$tissue = gsub(".*_","",cor_table$gene_tissue)
+    cor_table = cor_table[!is.na(cor_table$tissue),]
+    cor_table = cor_table[order(cor_table$pvalue, decreasing = F),]
+    cor_table
+  })
+  
+  output$res_bttn2 <- renderTable({
+    res1<-cor_table()
+    res1 = cor_table[cor_table$pvalue<0.01,]
+    res1 = na.omit(res1)
+    head(res1)
+  })
+  output$res_bttn2 = renderPlot({
+    cor_table<-cor_table()
+    sig_table = cor_table[cor_table$qvalue<0.1,]
+    sig_table$qcat =ifelse(sig_table$qvalue<0.01, 'q<0.01', 'q<0.1')
+    sig_table$qcat =ifelse(sig_table$qvalue<0.0001, 'q<0.0001', paste0(sig_table$qcat))
+    table(sig_table$tissue[sig_table$qcat=='q<0.01'])
+    
+    blank_theme <- theme_minimal()+
+      theme(
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        panel.border = element_blank(),
+        panel.grid=element_blank(),
+        axis.ticks = element_blank(),
+        plot.title=element_text(size=25, face="bold")
+      )
+    
+    binned_sig_prots= sig_table %>%
+      dplyr::group_by(qcat, tissue) %>%
+      dplyr::summarise(n = n()) %>%
+      dplyr::mutate(freq = n / sum(n))
+    
+    ggplot(binned_sig_prots, aes(x = "", y = freq, fill =tissue)) + 
+      geom_bar(stat = "identity", width = 1, position = position_fill()) + blank_theme + theme(plot.title=element_text(size=25, face="bold")) +
+      theme(axis.text.x=element_blank())+ scale_fill_manual(values=met.brewer('Moreau', length(unique(sig_table$tissue)))) +
+      coord_polar(theta = "y") + 
+      facet_wrap( ~ qcat)
+  })
+  # network
+  all_tog2<-reactive({
+    working_dataset<-working_dataset()
+    targets<-working_dataset()
+    targets2 = targets[,!grepl(origin_tissue, colnames(targets))]
+    full_cors = bicorAndPvalue(origin, targets2, use = 'p')
+    
+    cor_table = reshape2::melt(full_cors$bicor)
+    
+    cor_table$Var1=NULL
+    colnames(cor_table) = c('gene_tissue', 'bicor')
+    new_p = reshape2::melt(full_cors$p)
+    cor_table$pvalue = new_p$value[match(cor_table$gene_tissue, new_p$Var2)]
+    cor_table =na.omit(cor_table)
+    qest = qvalue(cor_table$pvalue, fdr.level = NULL)
+    cor_table$qvalue = qest$qvalues
+    cor_table$origin = paste(gene_tissue)
+    cor_table$gene_symbol = gsub("\\_.*","",cor_table$gene_tissue)
+    cor_table$tissue = gsub(".*_","",cor_table$gene_tissue)
+    cor_table = cor_table[!is.na(cor_table$tissue),]
+    cor_table$tissue_col=NULL
+    cor_table = cor_table[order(cor_table$qvalue, decreasing = F),]
+    new_table = cor_table[cor_table$pvalue<1e-4,]
+    new_table = new_table[!is.na(new_table$tissue),]
+    sig_set = new_table[!new_table$tissue==origin_tissue,]
+    row_length = ifelse(length(row.names(sig_set))>300, as.numeric(300), as.numeric(paste0(length(row.names(sig_set)))))
+    sig_set = sig_set[1:row_length,]
+    
+    all_tog2 = working_dataset[, colnames(working_dataset) %in% sig_set$gene_tissue | colnames(working_dataset)== gene_tissue]
+    all_tog2[is.na(all_tog2)] = 0
+    all_tog2
+  })
+  
+  map2<-reactive({
+    all_tog2<-all_tog2()
+    colkey1 = as.data.frame(gsub(".*_","",colnames(all_tog2)))
+    colnames(colkey1) = 'tissue'
+    
+    colkey1$cols = new_cols[match(colkey1$tissue, names(new_cols))]
+    bics_map = bicorAndPvalue(all_tog2, all_tog2, use = 'p')
+    
+    map1 = as.data.frame(bics_map$bicor)
+    map1 = melt(as.matrix(map1))
+    map1$value[map1$value > 0.999999] <- 0
+    map2 = dcast(map1, Var1 ~ Var2, value.var = 'value')
+    row.names(map2) = map2$Var1
+    map2$Var1 = NULL
+    map2
+  })
+  
+  
+  # plot undirected network
+  output$plot3 = renderPlot({
+    map2<-map2()
+    qgraph(map2, minimum = 0.2, cut = 0.6, vsize = 3, color=colkey1$cols, legend = F, borders = TRUE, layout='spring', posCol = "dodgerblue3", negCol = "firebrick3", label.cex=2, directed=F, labels = colnames(map2)) + ggtitle('')
+  })
+  
+  #plot directed network
+  output$plot4 = renderPlot({
+    all_tog2<-all_tog2()
+    net1 = mmhc(all_tog2) 
+    
+    qgraph(net1, vsize = 3, legend = F, color=colkey1$cols, borders = TRUE, layout='spring', label.cex=2, directed=T, labels = colnames(map2)) + ggtitle('')
+  })
+  
+  # plot tissue legend
+  output$plot5 = renderPlot({
+    plot(NULL ,xaxt='n',yaxt='n',bty='n',ylab='',xlab='', xlim=0:1, ylim=0:1)
+    legend("topleft", legend =names(new_cols), pch=16, pt.cex=3, cex=1.5, bty='n',
+           col = new_cols)
+    mtext("Tissue", at=0.2, cex=2)
+  })
+}
+
+shinyApp(ui = ui, server = server)
