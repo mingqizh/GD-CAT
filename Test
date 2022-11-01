@@ -124,13 +124,9 @@ server<-function(input, output){
     input$Gender
   })
   output$contents<-renderTable({
-    con <- dbConnect(drv = RPostgres::Postgres(), # driver we're using this time
-                     dbname = "gtex", 
-                     host = "127.0.0.1",
-                     user = "UCI_Seldin_lab", 
-                     password = "1234567890zZ",
-                     port = "3306" # common port for PostgreSQL, but check with DBA
-    )
+    a<-odbcConnect("UCI_Seldin_lab", uid = "root", pwd = "1234567890zZ!")
+    annot = sqlQuery(a, "USE gtex;", stringsAsFactors=F)
+    annot = sqlQuery(a, "select * from final", stringsAsFactors=F)
     head(con)
   })
   output$gene <- renderPrint({
