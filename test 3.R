@@ -70,6 +70,7 @@ ui<-fluidPage(
     ),
     plotOutput("res_bttn1_plot")
   ),
+  tableOutput("res_buttn1_table"),
   hr(),
   selectInput(
     "tissue2",
@@ -113,8 +114,11 @@ ui<-fluidPage(
       color = "primary",
       style = "bordered"
     ),
-    plotOutput("res_bttn2")
-  )
+    plotOutput("enrichment1")
+
+  ),
+  plotOutput("enrichment2"),
+  plotOutput("enrichment3")
   
 )
 
@@ -125,12 +129,11 @@ server<-function(input, output){
   output$gender <- renderPrint({
     input$Gender
   })
-  output$data<-reactive({
+  working_data<-reactive({
     a<-odbcConnect("UCI_Seldin_lab", uid = "root", pwd = "1234567890zZ!")
     annot = sqlQuery(a, "USE gtex;", stringsAsFactors=F)
-    annot = sqlQuery(a, "select * from final", stringsAsFactors=F)
+    annot = sqlQuery(a, "select * from a", stringsAsFactors=F)
     annot<-as.data.frame(annot)
-    annot
   })
   output$gene <- renderPrint({
     input$gene
@@ -141,74 +144,12 @@ server<-function(input, output){
 
   gene_tissue<-reactive({
     origin_tissue = paste0(input$gene, input$origin_tissue)
-    origin_tissue
   })
-  working_dataset<-reactive({
-    working_dataset = data()
-    
-    a<- working_dataset$gene_tissue_1
-    working_dataset$gene_tissue_1=NULL
-    working_dataset = as.data.frame(t(working_dataset))
-    colnames(working_dataset)<-a
-    targets <- working_dataset[,grepl('Adipose - Subcutaneous', colnames(working_dataset), fixed=T)
-                               | grepl('Adipose - Visceral (Omentum)', colnames(working_dataset), fixed=T)
-                               | grepl('Brain - Hypothalamus', colnames(working_dataset), fixed=T)
-                               | grepl('Colon - Transverse', colnames(working_dataset), fixed=T)
-                               | grepl('Spleen', colnames(working_dataset), fixed=T)
-                               | grepl('Small Intestine - Terminal Ileum', colnames(working_dataset), fixed=T)
-                               | grepl('Artery - Coronary', colnames(working_dataset), fixed=T)
-                               | grepl('Stomach', colnames(working_dataset), fixed=T)
-                               | grepl('Thyroid', colnames(working_dataset), fixed=T)
-                               | grepl('Pancreas', colnames(working_dataset), fixed=T)
-                               | grepl('Muscle - Skeletal', colnames(working_dataset), fixed=T)
-                               | grepl('Pituitary', colnames(working_dataset), fixed=T)
-                               | grepl('Liver', colnames(working_dataset), fixed=T)
-                               | grepl('Kidney - Cortex', colnames(working_dataset), fixed=T)
-                               | grepl('Heart - Left Ventricle', colnames(working_dataset), fixed=T)
-                               | grepl('Colon - Sigmoid', colnames(working_dataset), fixed=T)
-                               | grepl('Adrenal Gland', colnames(working_dataset), fixed=T) 
-                               | grepl('Artery - Aorta', colnames(working_dataset), fixed=T)
-                               | grepl('Brain - Hippocampus', colnames(working_dataset), fixed=T)
-                               | grepl('Artery - Aorta', colnames(working_dataset), fixed=T)
-                               | grepl('Lung', colnames(working_dataset), fixed=T)]
-    targets = as.data.frame(targets)
-    targets
-  })
-  new_table <- reactive({
-    # read file and reshape it
-    targets = working_dataset()
-    gene_tissue1 = paste0(input$gene, '_', input$origin_tissue)
-    gene_symbol = input$gene
-    
-    origin = tissue1[,grepl(gene_tissue1, colnames(tissue1))]
-    target = tissue1[,!grepl(gene_tissue1, colnames(tissue1))]
-    
-    full_cors = bicorAndPvalue(origin, target, use = 'p')
-    cor_table = reshape2::melt(full_cors$bicor)
-    cor_table$Var1=NULL
-    colnames(cor_table) = c('gene_tissue', 'bicor')
-    new_p = reshape2::melt(full_cors$p)
-    
-    cor_table$pvalue = new_p$value[match(cor_table$gene_tissue, new_p$Var2)]
-    cor_table = na.omit(cor_table)
-    qest = qvalue(cor_table$pvalue)
-    cor_table$qvalue = qest$qvalues
-    cor_table$gene_symbol = gsub("\\_.*","",cor_table$gene_tissue)
-    cor_table$tissue = gsub(".*_","",cor_table$gene_tissue)
-    cor_table = cor_table[!is.na(cor_table$tissue),]
-    cor_table = cor_table[order(cor_table$pvalue, decreasing = F),]
-    
-    res1 = cor_table[cor_table$pvalue<0.01,]
-    res1 = na.omit(res1)
-    rest1
-  })
-  output$res_buttn1_table<-renderTable({
-    new_table<-new_table()
-    head(new_table)
-  })
+ 
+
   output$res_bttn1_plot = renderPlot({
-    cor_table<-new_table()
-    sig_table = cor_table[cor_table$qvalue<0.1,]
+    annot<-working_data()
+    sig_table = annot[annot$qvalue<0.1,]
     sig_table$qcat =ifelse(sig_table$qvalue<0.01, 'q<0.01', 'q<0.1')
     sig_table$qcat =ifelse(sig_table$qvalue<0.0001, 'q<0.0001', paste0(sig_table$qcat))
     table(sig_table$tissue[sig_table$qcat=='q<0.01'])
@@ -224,44 +165,31 @@ server<-function(input, output){
       )
     
     binned_sig_prots= sig_table %>%
-      dplyr::group_by(qcat, tissue) %>%
+      dplyr::group_by(qcat, tissue_2) %>%
       dplyr::summarise(n = n()) %>%
       dplyr::mutate(freq = n / sum(n))
     
-    p<- ggplot(binned_sig_prots, aes(x = "", y = freq, fill =tissue)) + geom_bar(stat = "identity", width = 1, position = position_fill()) + blank_theme + theme(plot.title=element_text(size=25, face="bold")) +theme(axis.text.x=element_blank())+ scale_fill_manual(values=met.brewer('Moreau', length(unique(sig_table$tissue)))) +coord_polar(theta = "y") + facet_wrap( ~ qcat)
-    p<-as.data.frame(p)
-    p
+    
+    tissue_freqs = binned_sig_prots %>% dplyr::group_by(qcat) %>% dplyr::summarise(sum(n))
+    
+    binned_sig_prots$tot_count = tissue_freqs$`sum(n)`[match(binned_sig_prots$qcat, tissue_freqs$qcat)]
+    binned_sig_prots$qcat1 = paste0(binned_sig_prots$qcat, ' ', binned_sig_prots$tot_count, ' genes')
+    col_scheme = rev(met.brewer('Austria', length(unique(sig_table$tissue_2))))
+    names(col_scheme) = unique(sig_table$tissue)
+    
+
+    ggplot(binned_sig_prots, aes(x = "", y = freq, fill =tissue_2)) + 
+      geom_bar(stat = "identity", width = 1, position = position_fill()) + blank_theme + theme(plot.title=element_text(size=25, face="bold")) +
+      theme(axis.text.x=element_blank())+ scale_fill_manual(values=col_scheme) +
+      coord_polar(theta = "y") + 
+      facet_wrap( ~ qcat1)
+
 
   })
   # pathway network
   all_tog2<-reactive({
-    working_dataset = data()
+    new_table <- working_data()
     
-    a<- working_dataset$gene_tissue_2
-    working_dataset$gene_tissue_2=NULL
-    working_dataset = as.data.frame(t(working_dataset))
-    colnames(working_dataset)<-a
-    targets2<-working_dataset()
-    
-    origin = targets[,grepl(input$tissue2, colnames(targets))]
-    targets2 = targets[,!grepl(input$tissue2, colnames(targets))]
-    full_cors = bicorAndPvalue(origin, targets2, use = 'p')
-    
-    cor_table = reshape2::melt(full_cors$bicor)
-    
-    cor_table$Var1=NULL
-    colnames(cor_table) = c('gene_tissue', 'bicor')
-    new_p = reshape2::melt(full_cors$p)
-    cor_table$pvalue = new_p$value[match(cor_table$gene_tissue, new_p$Var2)]
-    cor_table =na.omit(cor_table)
-    qest = qvalue(cor_table$pvalue, fdr.level = NULL)
-    cor_table$qvalue = qest$qvalues
-    cor_table$origin = paste(gene_tissue)
-    cor_table$gene_symbol = gsub("\\_.*","",cor_table$gene_tissue)
-    cor_table$tissue = gsub(".*_","",cor_table$gene_tissue)
-    cor_table = cor_table[!is.na(cor_table$tissue),]
-    cor_table$tissue_col=NULL
-    cor_table = cor_table[order(cor_table$qvalue, decreasing = F),]
     new_table = cor_table[cor_table$pvalue<1e-4,]
     new_table = new_table[!is.na(new_table$tissue),]
     sig_set = new_table[!new_table$tissue==gene_tissue,]
@@ -270,23 +198,20 @@ server<-function(input, output){
     
     all_tog2 = working_dataset[, colnames(working_dataset) %in% sig_set$gene_tissue | colnames(working_dataset)== gene_tissue]
     all_tog2[is.na(all_tog2)] = 0
-    all_tog2
   })
   new_cols<-reactive({
-    working_dataset<-data()
+    working_dataset<-working_data()
     tissue_set = unique(gsub(".*_","",working_dataset$gene_tissue_2))
     new_cols = met.brewer('Moreau', length(tissue_set))
     names(new_cols) = unique(tissue_set)
-    new_cols
   })
-
-  map2<-reactive({
-    all_tog2<-all_tog2()
-    new_cols<-new_cols()
+  colkey1<-reactive({
     colkey1 = as.data.frame(gsub(".*_","",colnames(all_tog2)))
     colnames(colkey1) = 'tissue'
     
     colkey1$cols = new_cols[match(colkey1$tissue, names(new_cols))]
+  })
+  map2<-reactive({
     bics_map = bicorAndPvalue(all_tog2, all_tog2, use = 'p')
     
     map1 = as.data.frame(bics_map$bicor)
@@ -295,31 +220,26 @@ server<-function(input, output){
     map2 = dcast(map1, Var1 ~ Var2, value.var = 'value')
     row.names(map2) = map2$Var1
     map2$Var1 = NULL
-    map2
   })
   
   
   # plot undirected network
   output$plot3 = renderPlot({
-    map2<-map2()
     p<-qgraph(map2, minimum = 0.2, cut = 0.6, vsize = 3, color=colkey1$cols, legend = F, borders = TRUE, layout='spring', posCol = "dodgerblue3", negCol = "firebrick3", label.cex=2, directed=F, labels = colnames(map2)) + ggtitle('')
-    p<-as.data.frame(p)
-    p
+    print(p)
   })
   
   #plot directed network
   output$plot4 = renderPlot({
-    all_tog2<-all_tog2()
     net1 = mmhc(all_tog2) 
-    
     p<-qgraph(net1, vsize = 3, legend = F, color=colkey1$cols, borders = TRUE, layout='spring', label.cex=2, directed=T, labels = colnames(map2)) + ggtitle('')
     p<-as.data.frame(p)
-    p
+    print(p)
   })
   
   # plot tissue legend
   output$plot5 = renderPlot({
-    new_cols<-new_cols()
+    new_cols<-new_cols
     plot(NULL ,xaxt='n',yaxt='n',bty='n',ylab='',xlab='', xlim=0:1, ylim=0:1)
     legend("topleft", legend =names(new_cols), pch=16, pt.cex=3, cex=1.5, bty='n',
            col = new_cols)
@@ -327,67 +247,44 @@ server<-function(input, output){
   })
   
   # enrichment 
-  output$res_bttn2 = renderPlot({
-    working_dataset = data()
-    a<- working_dataset$gene_tissue_2
-    working_dataset$gene_tissue_2=NULL
-    working_dataset = as.data.frame(t(working_dataset))
-    colnames(working_dataset)<-a
-    candid_gene = c(input$gene, input$tissue2)
-    new_working1 = working_dataset[,colnames(working_dataset) %in% candid_gene]
-    new_working2 = working_dataset[,!colnames(working_dataset) %in% candid_gene]
-    full_cors = bicorAndPvalue(new_working1, new_working2, use = 'p')
-    cor_table = reshape2::melt(full_cors$bicor)
-    head(cor_table)
-    cor_table$Var1=NULL
-    colnames(cor_table) = c('gene_tissue', 'bicor')
-    new_p = reshape2::melt(full_cors$p)
-    
-    cor_table$pvalue = new_p$value[match(cor_table$gene_tissue, new_p$Var2)]
-    cor_table = na.omit(cor_table)
-    qest = qvalue(cor_table$pvalue)
-    cor_table$qvalue = qest$qvalues
-    cor_table$gene_symbol = gsub("\\_.*","",cor_table$gene_tissue)
-    cor_table$tissue = gsub(".*_","",cor_table$gene_tissue)
-    cor_table = cor_table[!is.na(cor_table$tissue),]
-    tissue_col = met.brewer('Tara', length(unique(cor_table$tissue)))
-    names(tissue_col) = unique(cor_table$tissue)
-    cor_table$tissue_col = tissue_col[match(cor_table$tissue, names(tissue_col))]
-    cor_table = cor_table[order(cor_table$pvalue, decreasing = F),]
-    
-    res1 = cor_table[cor_table$pvalue<0.01,]
-    res1 = na.omit(res1)
-    write.csv(res1, file = paste0('significant crosstissue enrichments with ',  candid_gene, ' -origin included.csv'), row.names = F)
-    
-    sig_table = cor_table[cor_table$qvalue<0.1,]
+  enriched = reactive({
+    annot <- working_data()
+
+    sig_table = annot[annot$qvalue<0.1,]
     sig_table$qcat =ifelse(sig_table$qvalue<0.01, 'q<0.01', 'q<0.1')
     sig_table$qcat =ifelse(sig_table$qvalue<0.0001, 'q<0.0001', paste0(sig_table$qcat))
     table(sig_table$qcat)
     
-    binned_sig_prots= sig_table %>%
-      dplyr::group_by(tissue, qcat) %>%
-      dplyr::summarise(n = n()) %>%
-      dplyr::mutate(freq = n / sum(n))
     
     tissue_list = binned_sig_prots[binned_sig_prots$qcat=='q<0.01',]
     tissue_list = tissue_list[order(tissue_list$n, decreasing = T),]
     
-    select_tissue = tissue_list$tissue[1]
-    pp1 = res1[res1$qvalue<0.05,]
-    pp1 = pp1[pp1$tissue %in% select_tissue,]
+    select_tissue = tissue_list$tissue_2[1]
+    pp1 = annot[annot$qvalue<0.05,]
+    pp1 = pp1[pp1$tissue_2 %in% select_tissue,]
     pp1_length = ifelse(length(row.names(pp1)) > 200, as.numeric(200), as.numeric(length(row.names(pp1))))
     pp2 = pp1[1:pp1_length,]
-    gg1 = pp2$gene_symbol
+    gg1 = pp2$gene_symbol_2
     
     setEnrichrSite("Enrichr")
     dbs <- listEnrichrDbs()
     dbs1 <- c("GO_Biological_Process_2021", "GO_Molecular_Function_2021", "Reactome_2022", "DSigDB")
     
     enriched <- enrichr(gg1, dbs1)
-    p<-plotEnrich(enriched[[1]], showTerms = 20, numChar = 40, y = "Count", orderBy = "P.value")
-    p<-as.data.frame(p)
-    p
     
+
+  })
+  output$enrichment1<-renderPlot({
+    enriched<-enriched()
+    plotEnrich(enriched[[1]], showTerms = 20, numChar = 40, y = "Count", orderBy = "P.value")
+  })
+  output$enrichment2<-renderPlot({
+    enriched<-enriched()
+    plotEnrich(enriched[[2]], showTerms = 20, numChar = 40, y = "Count", orderBy = "P.value")
+  })
+  output$enrichment3<-renderPlot({
+    enriched<-enriched()
+    plotEnrich(enriched[[3]], showTerms = 20, numChar = 40, y = "Count", orderBy = "P.value")
   })
 }
 
