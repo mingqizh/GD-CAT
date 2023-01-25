@@ -279,3 +279,7 @@ dev.off()
 pdf(file = paste0(select_tissue, ' gene correlations with ', candid_gene, ' ', names(enriched[2]), '.pdf'))
 plotEnrich(enriched[[2]], showTerms = 20, numChar = 40, y = "Count", orderBy = "P.value")
 dev.off()
+
+billboarder() %>% 
+  +     bb_piechart(binned_sig_prots, bbaes(tissue_2, freq))%>% bb_legend(position = 'right') %>%
+  +     bb_color(palette = col_scheme)
