@@ -28,6 +28,7 @@ library(RSQLite)
 library(RPostgres)
 library(enrichR)
 library(data.table)
+library(billboarder)
 working_dataset=fread("first 100 gene cocorrelation across two adipose tissues - melted data for SQL input.csv")
 working_dataset<-annot
 working_dataset$gene_tissue_1 = paste0(working_dataset$gene_symbol_1, '_', working_dataset$tissue_1)
@@ -39,7 +40,7 @@ colnames(working_dataset)<-a
 test1 = working_dataset[,grepl('AARS2', colnames(working_dataset))]
 colnames(test1)
 
-gene_1 = 'AARS2'
+gene_1 = 'ADIPOQ'
 origin_tissue = 'Adipose - Subcutaneous'
 gene_tissue1 = paste0(gene_1, '_', origin_tissue)
 tissue1 <- working_dataset[,grepl('Adipose - Subcutaneous', colnames(working_dataset))
@@ -87,6 +88,7 @@ res1 = na.omit(res1)
 write.csv(res1, file = paste0('significant crosstissue enrichments ', gene_tissue1, '.csv'), row.names = F)
 
 sig_table = annot[annot$qvalue<0.1,]
+sig_table$qvalue<-as.numeric(sig_table$qvalue)
 sig_table$qcat =ifelse(sig_table$qvalue<0.01, 'q<0.01', 'q<0.1')
 sig_table$qcat =ifelse(sig_table$qvalue<0.0001, 'q<0.0001', paste0(sig_table$qcat))
 table(sig_table$tissue[sig_table$qcat=='q<0.01'])
@@ -114,22 +116,116 @@ binned_sig_prots$qcat1 = paste0(binned_sig_prots$qcat, ' ', binned_sig_prots$tot
 col_scheme = rev(met.brewer('Austria', length(unique(sig_table$tissue_2))))
 names(col_scheme) = unique(sig_table$tissue)
 
-binned_sig_prots$tissue_2 <- factor(binned_sig_prots$tissue_2, levels = levels(binned_sig_prots$n[binned_sig_prots$qcat=="q<0.01 11557 genes",]))
+
+binned_sig_prots$tissue_2 <-  reorder(binned_sig_prots$tissue_2, binned_sig_prots$n, decreasing = TRUE)
+
 
 pdf(file = paste0('crosstissue gene enrichments ', gene_tissue1, '.pdf'))
 ggplot(binned_sig_prots, aes(x = "", y = freq, fill =tissue_2)) + 
-  geom_bar(stat = "identity", width = 1, position = position_fill()) + blank_theme + theme(plot.title=element_text(size=25, face="bold")) +
+  geom_bar(stat = "identity", width = 1, position = position_fill()) + blank_theme + 
+  theme(plot.title=element_text(size=25, face="bold")) +
   theme(axis.text.x=element_blank())+ scale_fill_manual(values=col_scheme) +
   coord_polar(theta = "y") + 
   facet_wrap( ~ qcat1)
 dev.off()
 
 
+
+annot<-a
+annot<-annot[!grepl(annot$tissue_1[1], annot$tissue_2),]
+sig_table = annot[annot$qvalue<0.1,]
+sig_table$qvalue<-as.numeric(sig_table$qvalue)
+sig_table$qcat =ifelse(sig_table$qvalue<0.01, 'q<0.01', 'q<0.1')
+sig_table$qcat =ifelse(sig_table$qvalue<0.0001, 'q<0.0001', paste0(sig_table$qcat))
+table(sig_table$tissue[sig_table$qcat=='q<0.01'])
+
+blank_theme <- theme_minimal()+
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    panel.border = element_blank(),
+    panel.grid=element_blank(),
+    axis.ticks = element_blank(),
+    plot.title=element_text(size=25, face="bold")
+  )
+
+binned_sig_prots= sig_table %>%
+  dplyr::group_by(qcat, tissue_2) %>%
+  dplyr::summarise(n = n()) %>%
+  dplyr::mutate(freq = n / sum(n))
+
+
+tissue_freqs = binned_sig_prots %>% dplyr::group_by(qcat) %>% dplyr::summarise(sum(n))
+
+binned_sig_prots$tot_count = tissue_freqs$`sum(n)`[match(binned_sig_prots$qcat, tissue_freqs$qcat)]
+binned_sig_prots$qcat1 = paste0(binned_sig_prots$qcat, ' ', binned_sig_prots$tot_count, ' genes')
+col_scheme = rev(met.brewer('Austria', length(unique(sig_table$tissue_2))))
+names(col_scheme) = unique(sig_table$tissue)
+
+binned_sig_prots$tissue_2 <-  reorder(binned_sig_prots$tissue_2, binned_sig_prots$n,decreasing = T)
+
+
+pdf(file = paste0('crosstissue gene enrichments ', gene_tissue1, '.pdf'))
+p2<-ggplot(binned_sig_prots, aes(x = "", y = freq, fill =tissue_2)) + 
+  geom_bar(stat = "identity", width = 1, position = position_fill()) + blank_theme + 
+  theme(plot.title=element_text(size=25, face="bold")) +
+  theme(axis.text.x=element_blank())+ scale_fill_manual(values=col_scheme) +
+  coord_polar(theta = "y") + 
+  guides(fill = guide_legend(reverse = TRUE)) +
+  facet_wrap( ~ qcat1)
+dev.off()
+
+annot<-working_data()
+annot<-annot[!grepl(annot$tissue_1[1], annot$tissue_2),]
+sig_table = annot[annot$qvalue<0.1,]
+sig_table$qcat =ifelse(sig_table$qvalue<0.01, 'q<0.01', 'q<0.1')
+sig_table$qcat =ifelse(sig_table$qvalue<0.0001, 'q<0.0001', paste0(sig_table$qcat))
+table(sig_table$tissue[sig_table$qcat=='q<0.01'])
+
+blank_theme <- theme_minimal()+
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    panel.border = element_blank(),
+    panel.grid=element_blank(),
+    axis.ticks = element_blank(),
+    plot.title=element_text(size=25, face="bold")
+  )
+
+binned_sig_prots= sig_table %>%
+  dplyr::group_by(qcat, tissue_2) %>%
+  dplyr::summarise(n = n()) %>%
+  dplyr::mutate(freq = n / sum(n))
+
+
+tissue_freqs = binned_sig_prots %>% dplyr::group_by(qcat) %>% dplyr::summarise(sum(n))
+
+binned_sig_prots$tot_count = tissue_freqs$`sum(n)`[match(binned_sig_prots$qcat, tissue_freqs$qcat)]
+binned_sig_prots$qcat1 = paste0(binned_sig_prots$qcat, ' ', binned_sig_prots$tot_count, ' genes')
+col_scheme = rev(met.brewer('Austria', length(unique(sig_table$tissue_2))))
+names(col_scheme) = unique(sig_table$tissue)
+binned_sig_prots$tissue_2 <-  reorder(binned_sig_prots$tissue_2, binned_sig_prots$n)
+
+
+ggplot(binned_sig_prots, aes(x = "", y = freq, fill =tissue_2)) + 
+  geom_bar(stat = "identity", width = 1, position = position_fill()) + blank_theme + theme(plot.title=element_text(size=25, face="bold")) +
+  theme(axis.text.x=element_blank())+ scale_fill_manual(values=col_scheme) +
+  coord_polar(theta = "y") + 
+  guides(fill = guide_legend(reverse = TRUE)) +
+  facet_wrap( ~ qcat1)
+
 ## pathway tissue2
+annot<-a
 working_dataset=annot
 tissue_set = unique(gsub(".*_","",annot$tissue_2))
 new_cols = met.brewer('Moreau', length(tissue_set))
 names(new_cols) = unique(tissue_set)
+
+gene_2 = 'ADIPOQ'
+origin_tissue = 'Adipose - Subcutaneous'
+gene_tissue2 = paste0(gene_2, '_', origin_tissue)
+
+working_dataset$gene_tissue_2 = paste0(gene_1, '_', origin_tissue)
 a<- working_dataset$gene_tissue_2
 working_dataset$gene_tissue_2=NULL
 working_dataset = as.data.frame(t(working_dataset))
@@ -138,7 +234,7 @@ colnames(working_dataset)<-a
 origin_tissue = 'Adipose - Subcutaneous'
 gene_tissue2 = paste0(gene_1, '_', origin_tissue)
 
-tissue_set = unique(gsub(".*_","",tissue1$gene_tissue))
+tissue_set = unique(gsub(".*_","",annot$gene_tissue))
 new_cols = met.brewer('Moreau', length(tissue_set))
 names(new_cols) = unique(tissue_set)
 
@@ -230,6 +326,7 @@ res1 = na.omit(res1)
 write.csv(res1, file = paste0('significant crosstissue enrichments with ',  candid_gene, ' -origin included.csv'), row.names = F)
 
 sig_table = annot[annot$qvalue<0.1,]
+sig_table$qvalue<-as.numeric(sig_table$qvalue)
 sig_table$qcat =ifelse(sig_table$qvalue<0.01, 'q<0.01', 'q<0.1')
 sig_table$qcat =ifelse(sig_table$qvalue<0.0001, 'q<0.0001', paste0(sig_table$qcat))
 table(sig_table$qcat)
@@ -247,7 +344,8 @@ blank_theme <- theme_minimal()+
 binned_sig_prots= sig_table %>%
   dplyr::group_by(tissue_2, qcat) %>%
   dplyr::summarise(n = n()) %>%
-  dplyr::mutate(freq = n / sum(n))
+  dplyr::mutate(freq = n / sum(n)) %>%
+  dplyr::arrange(desc(freq))
 
 pdf(file = paste0('significant crosstissue enrichments with ',  candid_gene, '.pdf'))
 ggplot(binned_sig_prots, aes(x = "", y = freq, fill =tissue_2)) + 
@@ -260,7 +358,7 @@ dev.off()
 tissue_list = binned_sig_prots[binned_sig_prots$qcat=='q<0.01',]
 tissue_list = tissue_list[order(tissue_list$n, decreasing = T),]
 
-select_tissue = tissue_list$tissue_1[1]
+select_tissue = tissue_list$tissue_2[1]
 pp1 = annot[annot$qvalue<0.05,]
 pp1 = pp1[pp1$tissue_2 %in% select_tissue,]
 pp1_length = ifelse(length(row.names(pp1)) > 200, as.numeric(200), as.numeric(length(row.names(pp1))))
@@ -280,6 +378,35 @@ pdf(file = paste0(select_tissue, ' gene correlations with ', candid_gene, ' ', n
 plotEnrich(enriched[[2]], showTerms = 20, numChar = 40, y = "Count", orderBy = "P.value")
 dev.off()
 
-billboarder() %>% 
-  +     bb_piechart(binned_sig_prots, bbaes(tissue_2, freq))%>% bb_legend(position = 'right') %>%
-  +     bb_color(palette = col_scheme)
+
+
+billboarder(data = binned_sig_prots) %>% 
+  bb_aes(tissue_2, freq) %>% 
+  bb_piechart()%>% 
+  bb_legend(position = 'right') %>%
+  bb_color(palette = col_scheme)
+
+p1<-billboarder(data = binned_sig_prots) %>% 
+  bb_aes(tissue_2, freq) %>% 
+  bb_piechart()%>% 
+  bb_legend(position = 'right') %>%
+  bb_color(palette = col_scheme)
+
+p2<-billboarder(data = binned_sig_prots) %>% 
+  bb_aes(tissue_2, freq) %>% 
+  bb_piechart()%>% 
+  bb_legend(position = 'right') %>%
+  bb_color(palette = col_scheme)
+
+output$my_pie_chart <- renderPlotly({
+  plot_ly(data = my_data, values = ~value, labels = ~label, type = 'pie',
+          marker = list(colors = c('#F8766D', '#00BFC4', '#FFCE44')),
+          hoverinfo = 'label+value')
+  %>% event_register(event = 'plotly_click', id = 'my_pie_chart')
+})
+
+observeEvent(event_data("plotly_click", source = "my_pie_chart"), {
+  selected_label = event_data("plotly_click", source = "my_pie_chart")$x
+  # update other elements in the shiny app based on selected_label
+  # ...
+})
