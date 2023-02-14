@@ -27,6 +27,16 @@ t2<-function(){
           fluidRow(
             column(width=3,
                    box(title="Predictiors Input",status = "primary",width=12,collapsible = TRUE,solidHeader = TRUE,
+                       radioButtons(
+                         inputId = "specie",
+                         label = "Chose a specie",
+                         choices = c("Human","Mouse")
+                       ),
+                       radioButtons(
+                         "Gender", "Chose Sex",c("Male", "Female", "Both")
+                       ),
+                       textInput("gene", "Input a gene"),
+                       textInput("origan_tissue", "Input a origan - tissue"),
                        sliderInput(inputId = "topn",
                                    label = "How many genes that correlated with the tissue do you want to see?",
                                    value = 30, min = 1, max = 50
