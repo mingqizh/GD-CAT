@@ -1,0 +1,548 @@
+library(shiny)
+library(shinydashboard)
+library(dplyr)
+library(purrr)
+library(ggplot2)
+library(enrichR)
+library(echarts4r)
+library(MetBrewer)
+library(forcats)
+library(DT)
+library(zip)
+library(reticulate)
+library(Rcpp)
+library(Seurat)
+library(reshape2)
+library(colormap)
+library(bnlearn)
+library(bnstruct)
+library(patchwork)
+library(limma)
+library(qgraph)
+library(devtools)
+library(ADAPTS)
+library(preprocessCore)
+library(pheatmap)
+library(WGCNA)
+library(mclust)
+library(pheatmap)
+library(qvalue)
+library(RPostgres)
+library(enrichR)
+library(stats)
+library(forcats)
+library(MetBrewer)
+library(feather)
+library(tidyr)
+library(tibble)
+load("C:/Users/mingqiz7/Desktop/GTEx app/data/working_dataset.RData")
+#load('./working_dataset.RData')
+#write_feather(both[1:50,1:10000],"./shiny-pie-click/both.feather")
+#write_feather(female[1:50,1:10000], "./shiny-pie-click/female.feather")
+#write_feather(male[1:50,1:10000], "./shiny-pie-click/male.feather")
+both<-read_feather('./both.feather')
+female<-read_feather('./female.feather')
+male<-read_feather('./male.feather')
+
+header <- function(){
+  dashboardHeader(title = "Welcome to the GTEx Shiny App!")
+}
+
+sidebar <- function(){
+  dashboardSidebar(
+    sidebarMenu(
+      id = "tabs",
+      class= "hide",
+      menuItem("Settings",  tabName = "t2",icon = icon("dashboard"))
+    ),
+    radioButtons(inputId = "specie",label = "Chose a specie",choices = c("Human","Mouse")),
+    radioButtons("Gender", "Chose Sex",c("Male"="male", "Female"="female", "Both"="both")),
+    textInput("origin_gene","origin_gene",value = "ADIPOQ"),
+    textInput("origin_tissue","origin_tissue",value = "Adipose - Subcutaneous"),
+    sliderInput(inputId = "topn",label = "How many genes that correlated with the tissue do you want to see?",value = 30, min = 1, max = 50),
+    sliderInput(inputId = "slicen",label = "slice n",value = 5, min = 1, max = 10)
+  )
+}
+
+t2<-function(){
+  tabItem(tabName="t2",
+          fluidPage(
+            tabBox(title="Top-N",width=12,height="500px",
+                   tabPanel('Top-1',echarts4rOutput('plot.top1')),
+                   tabPanel('Top-2',echarts4rOutput('plot.top2')),
+                   tabPanel('Chart',echarts4rOutput('plot.map3')),
+                   tabPanel('Table',DTOutput('table.map2'))),
+            tabBox(
+              title = "Pie Chart",
+              width = 12,
+              tabPanel('Pie-1', echarts4rOutput('plot.p1')),
+              tabPanel('Pie-2', echarts4rOutput('plot.p2')),
+              tabPanel('Pie-3', echarts4rOutput('plot.p3')),
+              tabPanel('Table-1',DTOutput('table.t1')),
+              tabPanel('Pie-4', echarts4rOutput('plot.p4')),
+              tabPanel('Pie-5', echarts4rOutput('plot.p5')),
+              tabPanel('Pie-6', echarts4rOutput('plot.p6')),
+              tabPanel('Table-2',DTOutput('table.t2'))
+            ),
+            shinydashboard::box(
+              title = "Pie Chart",
+              width = 12,
+              verbatimTextOutput('text'),
+              actionButton('btn', class = "btn-primary", 'Enrichment Analysis'),
+              uiOutput('plots.en')
+            )
+          )
+  )
+}
+
+body <- function(){
+  dashboardBody(
+    tabItems(
+      t2()
+    )
+  )
+}
+
+f1<-function(annot){
+
+  
+  binned_sig_prots= annot %>%
+    dplyr::group_by(qcat, tissue_2) %>%
+    dplyr::summarise(n = n()) %>%
+    dplyr::mutate(freq = n / sum(n))%>%
+    dplyr::arrange(desc(freq))
+
+
+  tissue_freqs = binned_sig_prots %>% dplyr::group_by(qcat) %>% dplyr::summarise(sum(n))
+
+  binned_sig_prots$tot_count = tissue_freqs$`sum(n)`[match(binned_sig_prots$qcat, tissue_freqs$qcat)]
+  binned_sig_prots$qcat1 = paste0(binned_sig_prots$qcat, ' ', binned_sig_prots$tot_count, ' genes')
+
+  data<-binned_sig_prots
+  echart<- binned_sig_prots %>%
+    group_by(qcat) %>%
+    group_split() %>%
+    purrr::map(~{
+      qcat1<-unique(.x$qcat1)
+      qcat<-sub('q<','',unique(.x$qcat))
+      .x %>%
+        e_chart(tissue_2) %>%
+        e_pie(freq,name = qcat,right='20%') %>%
+        e_title(qcat1,left="center",textStyle=list(fontSize=12)) %>%
+        e_legend(type ='scroll',
+                 orient='vertical',
+                 top='center',
+                 right='5%') %>%
+        e_on(
+          list(seriesName = qcat),
+          "function(x){
+          //alert(Object.keys(x));
+          var msg = [x.seriesIndex,x.seriesName,x.name,x.dataIndex]
+          //alert(msg)
+          Shiny.setInputValue('selected_tissue',x.name, {priority: 'event'})
+          Shiny.setInputValue('selected_q',x.seriesName, {priority: 'event'});
+        }"
+        ) %>%
+        e_toolbox_feature(feature = "saveAsImage",title='Save')
+    })
+  return(list(data=data,echart=echart))
+}
+
+f2<-function(annot,origin_tissue){
+  annot<-annot[!grepl(origin_tissue, annot$tissue_2),]
+  sig_table = annot[annot$qvalue<0.1,]
+  sig_table$qcat =ifelse(sig_table$qvalue<0.01, 'q<0.01', 'q<0.1')
+  sig_table$qcat =ifelse(sig_table$qvalue<0.0001, 'q<0.0001', paste0(sig_table$qcat))
+
+  binned_sig_prots= sig_table %>%
+    dplyr::group_by(qcat, tissue_2) %>%
+    dplyr::summarise(n = n()) %>%
+    dplyr::mutate(freq = n / sum(n))
+
+
+  tissue_freqs = binned_sig_prots %>% dplyr::group_by(qcat) %>% dplyr::summarise(sum(n))
+
+  binned_sig_prots$tot_count = tissue_freqs$`sum(n)`[match(binned_sig_prots$qcat, tissue_freqs$qcat)]
+  binned_sig_prots$qcat1 = paste0(binned_sig_prots$qcat, ' ', binned_sig_prots$tot_count, ' genes')
+  binned_sig_prots$tissue_2 <-  reorder(binned_sig_prots$tissue_2, binned_sig_prots$n)
+  data<-binned_sig_prots # data
+  echart<-binned_sig_prots %>% # chart
+    group_by(qcat) %>%
+    group_split() %>%
+    purrr::map(~{
+      qcat1<-unique(.x$qcat1)
+      qcat<-sub('q<','',unique(.x$qcat))
+      .x %>%
+        e_chart(tissue_2) %>%
+        e_pie(freq,name = qcat,right='20%') %>%
+        e_title(qcat1,left="center",textStyle=list(fontSize=12)) %>%
+        e_legend(type ='scroll',
+                 orient='vertical',
+                 top='center',
+                 right='5%') %>%
+        e_on(
+          list(seriesName = qcat),
+          "function(x){
+          //alert(Object.keys(x));
+          var msg = [x.seriesIndex,x.seriesName,x.name,x.dataIndex]
+          //alert(msg)
+          Shiny.setInputValue('selected_tissue',x.name, {priority: 'event'})
+          Shiny.setInputValue('selected_q',x.seriesName, {priority: 'event'});
+        }"
+        ) %>%
+        e_toolbox_feature(feature = "saveAsImage",title='ä¿å­')
+    })
+  return(list(data=data,echart=echart))
+}
+
+f_e1 <- function(annot,select_tissue,q){
+  pp1 = annot[annot$qvalue<as.numeric(q),]
+  pp1 = pp1[pp1$bicor>0,]
+  pp1 = pp1[pp1$tissue_2 %in% select_tissue,]
+  pp1_length = ifelse(length(row.names(pp1)) > 200, as.numeric(200), as.numeric(length(row.names(pp1))))
+  pp2 = pp1[1:pp1_length,]
+  gg1 = pp2$gene_symbol_2
+
+  setEnrichrSite("Enrichr")
+  dbs <- listEnrichrDbs()
+  dbs1 <- c("GO_Biological_Process_2021", "KEGG_2021_Human")
+
+  enriched <- enrichr(gg1, dbs1)
+
+}
+
+f_e2 <- function(annot,select_tissue,q){
+  pp1 = annot[annot$qvalue<as.numeric(q),]
+  pp1 = pp1[pp1$bicor<0,]
+  pp1 = pp1[pp1$tissue_2 %in% select_tissue,]
+  pp1_length = ifelse(length(row.names(pp1)) > 200, as.numeric(200), as.numeric(length(row.names(pp1))))
+  pp2 = pp1[1:pp1_length,]
+  gg1 = pp2$gene_symbol_2
+
+  setEnrichrSite("Enrichr")
+  dbs <- listEnrichrDbs()
+  dbs1 <- c("GO_Biological_Process_2021", "KEGG_2021_Human")
+
+  enriched <- enrichr(gg1, dbs1)
+
+
+}
+
+#enriched1<-f_e1(working_data(),'Adipose - Subcutaneous')
+#plotEnrich(enriched1[[1]], showTerms = 20, numChar = 40, y = "Count", orderBy = "P.value")
+
+ui<-dashboardPage(header(), sidebar(), body())
+
+# working_data<- function(){
+#   read.csv('D:/R-lab/shiny-pie-click/test.csv')
+# }
+
+get_sig_table<-function(working_dataset,input){
+  origin_gene = input$origin_gene
+  origin_tissue = input$origin_tissue
+  origin_gene_tissue = paste0(origin_gene, '_', origin_tissue)
+
+  tissue2 <- working_dataset[,grepl('Adipose - Subcutaneous', colnames(working_dataset)) | grepl('Adipose - Visceral (Omentum)', colnames(working_dataset), fixed=T) | grepl('Brain - Hypothalamus', colnames(working_dataset)) | grepl('Brain - Hippocampus', colnames(working_dataset)) | grepl('Lung', colnames(working_dataset)) | grepl('Small Intestine - Terminal Ileum', colnames(working_dataset), fixed=T) | grepl('Stomach', colnames(working_dataset), fixed=T) | grepl('Thyroid', colnames(working_dataset), fixed=T) | grepl('Pancreas', colnames(working_dataset), fixed=T) | grepl('Spleen', colnames(working_dataset), fixed=T) | grepl('Muscle - Skeletal', colnames(working_dataset), fixed=T) | grepl('Pituitary', colnames(working_dataset), fixed=T) | grepl('Artery - Coronary', colnames(working_dataset), fixed=T) | grepl('Liver', colnames(working_dataset), fixed=T) | grepl('Kidney - Cortex', colnames(working_dataset), fixed=T) | grepl('Heart - Left Ventricle', colnames(working_dataset), fixed=T) | grepl('Colon - Transverse', colnames(working_dataset), fixed=T) | grepl('Colon - Sigmoid', colnames(working_dataset), fixed=T) | grepl('Adrenal Gland', colnames(working_dataset), fixed=T) |  grepl('Artery - Aorta', colnames(working_dataset), fixed=T),]
+
+
+  tissue1 <- working_dataset[,grepl(origin_gene_tissue, colnames(working_dataset), fixed=T)]
+
+
+  #tissue1 = tissue1[row.names(tissue1) %in% row.names(tissue2),]
+  #tissue2 = tissue2[row.names(tissue2) %in% row.names(tissue1),]
+
+  full_cors = bicorAndPvalue(tissue1, tissue2, use = 'p')
+  cor_table = reshape2::melt(full_cors$bicor)
+  new_p = reshape2::melt(full_cors$p)
+
+  colnames(cor_table) = c('gene_tissue_1', 'gene_tissue_2', 'bicor')
+  #can drop here to clear CPU
+  full_cors=NULL
+
+  cor_table$pvalue = signif(new_p$value, 3)
+  cor_table$bicor = round(cor_table$bicor, 3)
+  cor_table$qvalue = signif(p.adjust(cor_table$pvalue, "BH"), 3)
+  cor_table = cor_table[order(cor_table$qvalue, decreasing=F),]
+  cor_table = na.omit(cor_table)
+  cor_table$gene_symbol_1 = gsub("\\_.*","",cor_table$gene_tissue_1)
+  cor_table$tissue_1 = gsub(".*_","",cor_table$gene_tissue_1)
+  cor_table = cor_table[!is.na(cor_table$tissue_1),]
+
+  cor_table$gene_symbol_2 = gsub("\\_.*","",cor_table$gene_tissue_2)
+  cor_table$tissue_2 = gsub(".*_","",cor_table$gene_tissue_2)
+  cor_table = cor_table[!is.na(cor_table$tissue_2),]
+
+  #sig_table åé¢éè¦ç¨å°
+  sig_table = cor_table[cor_table$qvalue<0.1,]
+  sig_table$qcat =ifelse(sig_table$qvalue<0.01, 'q<0.01', 'q<0.1')
+  sig_table$qcat =ifelse(sig_table$qvalue<0.0001, 'q<0.0001', paste0(sig_table$qcat))
+
+  sig_table
+}
+get_top_genes1<-function(sig_table,max_gene_length){
+  col_scheme = rev(met.brewer('Austria', length(unique(sig_table$tissue_2))))
+  names(col_scheme) = unique(sig_table$tissue_2)
+  top_genes = sig_table[1:max_gene_length,]
+  top_genes$color = col_scheme[match(top_genes$tissue_2, names(col_scheme))]
+  top_genes
+}
+get_top_genes2<-function(sig_table,max_gene_length,origin_tissue){
+  col_scheme = rev(met.brewer('Austria', length(unique(sig_table$tissue_2))))
+  names(col_scheme) = unique(sig_table$tissue_2)
+
+  sig_table1 = sig_table[!sig_table$tissue_2 %in% origin_tissue,]
+  top_genes = sig_table1[1:max_gene_length,]
+  top_genes$color = col_scheme[match(top_genes$tissue_2, names(col_scheme))]
+
+  top_genes
+}
+get_map2<-function(working_dataset,sig_table,slicen,origin_gene_tissue){
+  network_genes = sig_table %>%
+    group_by(tissue_2) %>%
+    top_n(200, gene_tissue_2)
+
+  sql_pull_list = c(as.vector(network_genes$gene_tissue_2), origin_gene_tissue)
+
+  ######################
+  #I reran cors for these but skip to line 283
+  tissue1 <- working_dataset[, colnames(working_dataset)  %in% sql_pull_list]
+  full_cors = bicorAndPvalue(tissue1, tissue1, use = 'p')
+  cor_table = reshape2::melt(full_cors$bicor)
+  new_p = reshape2::melt(full_cors$p)
+  colnames(cor_table) = c('gene_tissue_1', 'gene_tissue_2', 'bicor')
+  #can drop here to clear CPU
+  full_cors=NULL
+  cor_table$pvalue = signif(new_p$value, 3)
+  cor_table$bicor = round(cor_table$bicor, 3)
+  cor_table$qvalue = signif(p.adjust(cor_table$pvalue, "BH"), 3)
+  cor_table = cor_table[order(cor_table$qvalue, decreasing=F),]
+  cor_table = na.omit(cor_table)
+  cor_table$gene_symbol_1 = gsub("\\_.*","",cor_table$gene_tissue_1)
+  cor_table$tissue_1 = gsub(".*_","",cor_table$gene_tissue_1)
+  cor_table = cor_table[!is.na(cor_table$tissue_1),]
+  cor_table$gene_symbol_2 = gsub("\\_.*","",cor_table$gene_tissue_2)
+  cor_table$tissue_2 = gsub(".*_","",cor_table$gene_tissue_2)
+  cor_table = cor_table[!is.na(cor_table$tissue_2),]
+  sql_pull_2 = cor_table
+
+  ######################################
+  #è¿éå ä¸ä¸ªslider bar éæ©slice(1:5)éç5 èå´æ¯1-10
+  network_gene_list = sql_pull_2 %>%
+    group_by(tissue_1) %>%
+    slice(1:slicen)
+
+
+  network_plot_table = sql_pull_2[sql_pull_2$gene_tissue_1 %in% network_gene_list$gene_tissue_1,]
+  network_plot_table = network_plot_table[network_plot_table$gene_tissue_2 %in% network_gene_list$gene_tissue_1,]
+
+  map1 = network_plot_table
+  #map1$cols = col_scheme[match(map1$tissue_1, names(col_scheme))]
+  map2 = dcast(map1, gene_tissue_1 ~ gene_tissue_2, value.var = 'bicor', fun.aggregate = mean)
+  row.names(map2) = map2$gene_tissue_1
+  map2$gene_tissue_1 = NULL
+  map2
+}
+
+server <- function(input, output, session) {
+  working_dataset<-reactive({
+    get(input$Gender)
+  })
+  working_data<-function(){
+    get_sig_table(working_dataset(),input)
+  }
+  
+  # top n
+  output$plot.top1<- renderEcharts4r({
+    top_genes1<-get_top_genes1(working_data(),input$topn)
+    
+    top_genes1 %>%
+      arrange(desc(abs(bicor))) %>%
+      e_chart(gene_tissue_2, width='500px', height = NULL) %>%
+      e_bar(bicor) %>%
+      e_legend(show=F) %>%
+      e_add_nested("itemStyle", color) %>%
+      e_grid(bottom="150px") %>%
+      e_x_axis(axisLabel = list(interval = 0, rotate = 45)) %>%
+      e_datazoom(type='inside') %>%
+      e_toolbox(show=F) %>%
+      e_tooltip(
+        trigger = 'item',
+        axisPointer = list(
+          type = "shadow",
+          axis='x'
+        )
+      )
+  }
+  )
+  output$plot.top2<- renderEcharts4r({
+    top_genes2<-get_top_genes2(working_data(),input$topn,input$origin_tissue)
+    
+    top_genes2 %>%
+      arrange(desc(abs(bicor))) %>%
+      e_chart(gene_tissue_2, width='500px', height = NULL) %>%
+      e_bar(bicor) %>%
+      e_legend(show=F) %>%
+      e_add_nested("itemStyle", color) %>%
+      e_grid(bottom="100px") %>%
+      e_x_axis(axisLabel = list(interval = 0, rotate = 45)) %>%
+      e_datazoom(type='inside') %>%
+      e_toolbox(show=F) %>%
+      e_tooltip(
+        trigger = 'item',
+        axisPointer = list(
+          type = "shadow",
+          axis='x'
+        )
+      )
+  }
+  )
+  # network
+  output$plot.map3<-renderEcharts4r({
+    map2<-get_map2(working_dataset(),working_data(),input$slicen,input$origin_gene_tissue)
+    map3<-map2 %>%
+      rownames_to_column('source') %>%
+      pivot_longer(cols = -source,names_to = 'target',values_to = 'bicor')
+    map3 %>%
+      e_charts(source, width='500px', height = NULL) %>%
+      e_heatmap(target,bicor) %>%
+      e_visual_map(bicor) %>%
+      e_grid(top='20px',right='30px',left='20%',bottom='30%') %>%
+      e_x_axis(axisLabel = list(rotate = 45)) %>%
+      e_tooltip() %>%
+      e_toolbox_feature(feature = "saveAsImage",title='Save')
+  }
+  )
+  output$table.map2<-renderDT(
+    get_map2(working_dataset(),working_data(),input$slicen,input$origin_gene_tissue),
+    extensions = 'Buttons',
+    options = list(dom = 'Blfrtip',
+                   scrollX=TRUE,
+                   autoWidth=FALSE,
+                   buttons = c('copy','csv','excel'),
+                   lengthMenu = list(c(10.25,50),
+                                     c(10,25,59,"All"))
+    )
+  )
+  # pie chart
+  pie1<-reactive({
+    print(dim(working_data()))
+    f1(working_data())$echart
+  })
+  output$plot.p1 <- renderEcharts4r({
+    pie1()[[1]]
+  })
+  output$plot.p2 <- renderEcharts4r({
+    pie1()[[2]]
+  })
+  output$plot.p3 <- renderEcharts4r({
+    pie1()[[3]]
+  })
+  pie2<-reactive({
+    f2(working_data(),input$origin_tissue)$echart
+  })
+  output$plot.p4 <- renderEcharts4r({
+    pie2()[[1]]
+  })
+  output$plot.p5 <- renderEcharts4r({
+    pie2()[[2]]
+  })
+  output$plot.p6 <- renderEcharts4r({
+    pie2()[[3]]
+  })
+  # table
+  output$table.t1 <- renderDT(
+    f1(working_data())$data,
+    extensions = 'Buttons',
+    options = list(dom = 'Blfrtip',
+                   scrollX=TRUE,
+                   autoWidth=FALSE,
+                   buttons = c('copy','csv','excel'),
+                   lengthMenu = list(c(10.25,50),
+                                     c(10,25,59,"All"))))
+  output$table.t2 <- renderDT(
+    f2(working_data())$data,
+    extensions = 'Buttons',
+    options = list(dom = 'Blfrtip',
+                   scrollX=TRUE,
+                   autoWidth=FALSE,
+                   buttons = c('copy','csv','excel'),
+                   lengthMenu = list(c(10.25,50),
+                                     c(10,25,59,"All"))
+    ))
+  
+  
+  # click
+  output$text <- renderText({
+    print(c(input$selected_tissue,input$selected_q))
+  })
+  # enrichment
+  plots<-reactiveVal()
+  observeEvent( input$btn, {
+    if(!is.null(input$selected_tissue)){
+      progress <- Progress$new(session, min=0, max=5)
+      on.exit(progress$close())
+      progress$set(message = 'Calculation in progress',
+                   detail = 'This may take a while...')
+      progress$set(value = 1)
+
+      enriched1<-f_e1(working_data(),input$selected_tissue,input$selected_q)
+      plots_en1<- enriched1 %>%
+        purrr::map(~plotEnrich(.x, showTerms = 20, numChar = 40, y = "Count", orderBy = "P.value"))
+      progress$set(value = 2)
+
+      enriched2<-f_e2(working_data(),input$selected_tissue,input$selected_q)
+      plots_en2<- enriched2 %>%
+        purrr::map(~plotEnrich(.x, showTerms = 20, numChar = 40, y = "Count", orderBy = "P.value"))
+      progress$set(value = 3)
+
+      plots_all<-c(plots_en1,plots_en2)
+      plots(plots_all)
+      output[['plots.en']]<-renderUI({
+        plot_output_list <- lapply(1:length(plots_all), function(i) {
+          plotname <- paste("en", i, sep="")
+          plotOutput(plotname)
+        })
+        plot_output_list$btn_down<- downloadButton("download", "Download Image")
+        do.call(tagList, plot_output_list)
+      }
+      )
+      progress$set(value = 4)
+      for (i in 1:length(plots_all)) {
+        local({
+          my_i <- i
+          plotname <- paste("en", my_i, sep="")
+          output[[plotname]] <- renderPlot({
+            plots_all[[my_i]]
+          })
+        })
+      }
+      progress$set(value = 5)
+    } else {
+      showNotification("Please first click the Pie chart body to selected an tissue.",duration = NULL,type="warning")
+    }
+  })
+  output$download <- downloadHandler(
+    filename = function() {
+      paste("Plots-", Sys.Date(), ".zip", sep="")
+    },
+    content = function(file) {
+      owd <- setwd(tempdir())
+      on.exit(setwd(owd))
+      plots<-plots()
+      for(i in 1:length(plots)){
+        ggsave( paste0('plot',i,'.png'), plot = plots[[i]], device = "png")
+      }
+      zip::zip(file,paste0('plot',1:length(plots),'.png'))
+    }
+  )
+  # tips
+  observeEvent(input$tabs, {
+    if(input$tabs=='t2'){
+      showNotification("Click the legend (on the right of the chart body) of the Pie chart to toggle the display of the series.",duration = NULL,type="message")
+    }
+  })
+}
+
+shinyApp(ui, server)
+
+
