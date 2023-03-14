@@ -60,7 +60,7 @@ sidebar <- function(){
     textInput("origin_gene","origin_gene",value = "ADIPOQ"),
     textInput("origin_tissue","origin_tissue",value = "Adipose - Subcutaneous"),
     sliderInput(inputId = "topn",label = "How many top ranked genes that correlated with the tissue do you want to see?",value = 30, min = 1, max = 50),
-    sliderInput(inputId = "slicen",label = "slice n",value = 5, min = 1, max = 10)
+    actionButton('import', class = "btn-primary", 'Process data')
   )
 }
 
@@ -68,6 +68,7 @@ t2<-function(){
   tabItem(tabName="t2",
           fluidPage(
             tabBox(title="Top-N",width=12,height="500px",
+                   
                    tabPanel('Top ranked genes',echarts4rOutput('plot.top1')),
                    tabPanel('Top ranked genes without origin tissue',echarts4rOutput('plot.top2'))
             ),
@@ -92,6 +93,7 @@ t2<-function(){
             shinydashboard::box(
               title = "Network Analysis",
               width = 12,
+              sliderInput(inputId = "slicen",label = "slice n",value = 5, min = 1, max = 10),
               actionButton('btn1', class = "btn-primary", 'Start Analysis'),
               tabPanel('Chart',echarts4rOutput('plot.map3')),
               tabPanel('Table',DTOutput('table.map2'))
@@ -350,8 +352,15 @@ server <- function(input, output, session) {
   working_data<-function(){
     get_sig_table(working_dataset(),input)
   }
-  sig_table<-reactive({
-    working_data()
+
+  sig_table<-eventReactive(input$import,{
+    progress <- Progress$new(session, min=0, max=5)
+    on.exit(progress$close())
+    progress$set(message = 'Pre-processing raw data',
+                 detail = 'It will take around 2 mins')
+    progress$set(value = 1)
+    sig_table<-working_data()
+    sig_table
   })
   
   # top n
@@ -400,32 +409,42 @@ server <- function(input, output, session) {
   }
   )
   # network
-  map1<-reactive({
-    map1<-get_map2(working_dataset(),sig_table(),input$slicen,input$origin_gene_tissue)
-    map1
-  })
-  output$plot.net<-renderPlot({
-    map1<-map1()
-    origin_gene = input$origin_gene
-    origin_tissue = input$origin_tissue
-    origin_gene_tissue = paste0(origin_gene, '_', origin_tissue)
+  #map1<-reactive({
+  #  map1<-get_map2(working_dataset(),sig_table(),input$slicen,input$origin_gene_tissue)
+  #  map1
+  #})
+  #output$plot.net<-renderPlot({
+  #map1<-map1()
+  #origin_gene = input$origin_gene
+  #origin_tissue = input$origin_tissue
+  # origin_gene_tissue = paste0(origin_gene, '_', origin_tissue)
+  # 
+  # map2 = dcast(map1, gene_tissue_1 ~ gene_tissue_2, value.var = 'bicor', fun.aggregate = mean)
+  # row.names(map2) = map2$gene_tissue_1
+  # map2$gene_tissue_1 = NULL
+  # cols_set = as.data.frame(row.names(map2))
+  # row.names(cols_set) = row.names(map2)
+  # cols_set$cols = map1$cols[match(row.names(cols_set), map1$gene_tissue_1)]
+  # cols_set$cols = ifelse(row.names(cols_set) %in% origin_gene_tissue, 'gray5', paste0(cols_set$cols))
     
+  # qgraph(map2, minimum = 0.3, cut = 0.8, vsize = 3, color=cols_set$cols, legend = F, borders = TRUE, layout='spring', posCol = "dodgerblue3", negCol = "firebrick3", label.cex=3, directed=F, labels = colnames(map2)) + ggtitle(paste0('Undirected network for ', origin_gene_tissue, ' with labels')) 
+    
+  #})
+  map2<-eventReactive(input$btn1,{
+    progress <- Progress$new(session, min=0, max=5)
+    on.exit(progress$close())
+    progress$set(message = 'Calculation in progress',
+                 detail = 'This may take a while...')
+    progress$set(value = 1)
+    map1<-get_map2(working_dataset(),sig_table(),input$slicen,input$origin_gene_tissue)
     map2 = dcast(map1, gene_tissue_1 ~ gene_tissue_2, value.var = 'bicor', fun.aggregate = mean)
     row.names(map2) = map2$gene_tissue_1
     map2$gene_tissue_1 = NULL
-    cols_set = as.data.frame(row.names(map2))
-    row.names(cols_set) = row.names(map2)
-    cols_set$cols = map1$cols[match(row.names(cols_set), map1$gene_tissue_1)]
-    cols_set$cols = ifelse(row.names(cols_set) %in% origin_gene_tissue, 'gray5', paste0(cols_set$cols))
-    
-    qgraph(map2, minimum = 0.3, cut = 0.8, vsize = 3, color=cols_set$cols, legend = F, borders = TRUE, layout='spring', posCol = "dodgerblue3", negCol = "firebrick3", label.cex=3, directed=F, labels = colnames(map2)) + ggtitle(paste0('Undirected network for ', origin_gene_tissue, ' with labels')) 
-    
+    map2
   })
   output$plot.map3<-renderEcharts4r({
-    map1<-map1()
-    map2 = dcast(map1, gene_tissue_1 ~ gene_tissue_2, value.var = 'bicor', fun.aggregate = mean)
-    row.names(map2) = map2$gene_tissue_1
-    map2$gene_tissue_1 = NULL
+    if (is.null(map2)) return()
+    map2<-map2()
 
     map3<-map2 %>%
       rownames_to_column('source') %>%
@@ -440,17 +459,17 @@ server <- function(input, output, session) {
       e_toolbox_feature(feature = "saveAsImage",title='Save')
   }
   )
-  output$table.map2<-renderDT(
-    get_map2(working_dataset(),sig_table(),input$slicen,input$origin_gene_tissue),
-    extensions = 'Buttons',
-    options = list(dom = 'Blfrtip',
-                   scrollX=TRUE,
-                   autoWidth=FALSE,
-                   buttons = c('copy','csv','excel'),
-                   lengthMenu = list(c(10.25,50),
-                                     c(10,25,59,"All"))
-    )
-  )
+  #output$table.map2<-renderDT(
+  #  get_map2(working_dataset(),sig_table(),input$slicen,input$origin_gene_tissue),
+  # extensions = 'Buttons',
+  # options = list(dom = 'Blfrtip',
+  #                scrollX=TRUE,
+  #                autoWidth=FALSE,
+  #                buttons = c('copy','csv','excel'),
+  #                lengthMenu = list(c(10.25,50),
+  #                                  c(10,25,59,"All"))
+  # )
+  #)
   # pie chart
   pie1<-reactive({
     print(dim(sig_table()))
