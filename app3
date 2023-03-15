@@ -110,6 +110,8 @@ body <- function(){
   )
 }
 
+ui<-dashboardPage(header(), sidebar(), body())
+
 f1<-function(annot){
   
   
@@ -236,7 +238,7 @@ f_e2 <- function(annot,select_tissue,q){
 }
 
 
-ui<-dashboardPage(header(), sidebar(), body())
+
 
 
 
@@ -347,7 +349,15 @@ get_map2<-function(working_dataset,sig_table,slicen,origin_gene_tissue){
 
 server <- function(input, output, session) {
   working_dataset<-reactive({
-    get(input$Gender)
+    load("C:/Users/mingqiz7/Desktop/GTEx app/data/working_dataset.RData")
+    if(input$Gender == "both"){
+        working_dataset<-both
+      }else if(input$Gender == "male"){
+        working_dataset<-male
+      }else{
+        working_dataset<-female
+      }
+      working_dataset
   })
   working_data<-function(){
     get_sig_table(working_dataset(),input)
