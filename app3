@@ -36,13 +36,7 @@ library(feather)
 library(tidyr)
 library(tibble)
 load("C:/Users/mingqiz7/Desktop/GTEx app/data/working_dataset.RData")
-#load('./working_dataset.RData')
-#write_feather(both[1:50,1:10000],"./shiny-pie-click/both.feather")
-#write_feather(female[1:50,1:10000], "./shiny-pie-click/female.feather")
-#write_feather(male[1:50,1:10000], "./shiny-pie-click/male.feather")
-both<-read_feather('./both.feather')
-female<-read_feather('./female.feather')
-male<-read_feather('./male.feather')
+
 
 header <- function(){
   dashboardHeader(title = "Welcome to the GTEx Shiny App!")
