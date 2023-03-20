@@ -35,6 +35,7 @@ library(MetBrewer)
 library(feather)
 library(tidyr)
 library(tibble)
+allowWGCNAThreads()
 load("C:/Users/mingqiz7/Desktop/GTEx app/data/working_dataset.RData")
 
 
@@ -61,6 +62,9 @@ sidebar <- function(){
 t2<-function(){
   tabItem(tabName="t2",
           fluidPage(
+            tabBox(title="Cell type",width=12,height="500px",
+                   tabPanel('Cell type',echarts4rOutput('cell'))
+            ),
             tabBox(title="Top-N",width=12,height="500px",
                    
                    tabPanel('Top ranked genes',echarts4rOutput('plot.top1')),
@@ -278,6 +282,38 @@ get_sig_table<-function(working_dataset,input){
   
   sig_table
 }
+get_cell<-function(working_dataset, sig_table){
+  col_scheme = rev(met.brewer('Austria', length(unique(sig_table$tissue_2))))
+  names(col_scheme) = unique(sig_table$tissue_2)
+  #read in sc-seq matrix 
+  sc_matrix = read.csv('C:/Users/mingqiz7/Desktop/GTEx app/data/full pan-tissue DECON abundances.csv')
+  
+  #filter sc-seq matrix based on working_dataset object 
+  row.names(sc_matrix) = sc_matrix$GTExID
+  sc_matrix$GTExID = NULL
+  sc_matrix = sc_matrix[row.names(sc_matrix) %in% row.names(working_dataset),]
+  tissue1 <- working_dataset[,grepl('ADIPOQ_Adipose - Subcutaneous', colnames(working_dataset), fixed=T)]
+  
+  full_cors_sc = bicorAndPvalue(tissue1, sc_matrix, use = 'p')
+  cor_table_sc = reshape2::melt(full_cors_sc$bicor)
+  new_p = reshape2::melt(full_cors_sc$p)
+  cor_table_sc$Var1=NULL
+  colnames(cor_table_sc) = c('cell_tissue', 'bicor')
+  
+  
+  cor_table_sc$pvalue = signif(new_p$value, 3)
+  cor_table_sc$bicor = round(cor_table_sc$bicor, 3)
+  cor_table_sc$qvalue = signif(p.adjust(cor_table_sc$pvalue, "BH"), 3)
+  cor_table_sc = cor_table_sc[order(cor_table_sc$qvalue, decreasing=F),]
+  cor_table_sc = na.omit(cor_table_sc)
+  cor_table_sc$tissue = gsub(".*_","",cor_table_sc$cell_tissue)
+  cor_table_sc$tissue = gsub('...', ' - ', cor_table_sc$tissue, fixed=T)
+  cor_table_sc$tissue = gsub('..Omentum.', ' (Omentum)', cor_table_sc$tissue, fixed=T)
+  cor_table_sc$tissue = gsub('Left.Ventricle', 'Left Ventricle', cor_table_sc$tissue, fixed=T)
+  top_genes2 = cor_table_sc[cor_table_sc$pvalue<0.001,]
+  top_genes2$color = col_scheme[match(top_genes2$tissue, names(col_scheme))]
+  top_genes2 = top_genes2[order(abs(top_genes2$bicor), decreasing = T),]
+}
 get_top_genes1<-function(sig_table,max_gene_length){
   col_scheme = rev(met.brewer('Austria', length(unique(sig_table$tissue_2))))
   names(col_scheme) = unique(sig_table$tissue_2)
@@ -342,7 +378,7 @@ get_map2<-function(working_dataset,sig_table,slicen,origin_gene_tissue){
 }
 
 server <- function(input, output, session) {
-  working_dataset<-reactive({
+  working_dataset<-eventReactive(input$import,{
     load("C:/Users/mingqiz7/Desktop/GTEx app/data/working_dataset.RData")
     if(input$Gender == "both"){
         working_dataset<-both
@@ -366,7 +402,29 @@ server <- function(input, output, session) {
     sig_table<-working_data()
     sig_table
   })
-  
+  #cell type
+  output$cell<- renderEcharts4r({
+    top_genes1<-get_cell(working_dataset(),sig_table())
+    
+    top_genes1 %>%
+      arrange(desc(abs(bicor))) %>%
+      e_chart(cell_tissue, width='400px', height = NULL) %>%
+      e_bar(bicor) %>%
+      e_legend(show=F) %>%
+      e_add_nested("itemStyle", color) %>%
+      e_grid(bottom="150px") %>%
+      e_x_axis(axisLabel = list(interval = 0, rotate = 45)) %>%
+      e_datazoom(type='inside') %>%
+      e_toolbox(show=F) %>%
+      e_tooltip(
+        trigger = 'item',
+        axisPointer = list(
+          type = "shadow",
+          axis='x'
+        )
+      )
+  }
+  )
   # top n
   output$plot.top1<- renderEcharts4r({
     top_genes1<-get_top_genes1(sig_table(),input$topn)
