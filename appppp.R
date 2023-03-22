@@ -378,7 +378,6 @@ server <- function(input, output, session) {
     origin_gene = input$origin_gene
     origin_tissue = input$origin_tissue
     origin_gene_tissue = paste0(origin_gene, '_', origin_tissue)
-    progress$set(value = 2)
     working_dataset<-working_dataset()
     tissue2 <- working_dataset[,grepl('Adipose - Subcutaneous', colnames(working_dataset)) | grepl('Adipose - Visceral (Omentum)', colnames(working_dataset), fixed=T) | grepl('Brain - Hypothalamus', colnames(working_dataset)) | grepl('Brain - Hippocampus', colnames(working_dataset)) | grepl('Small Intestine - Terminal Ileum', colnames(working_dataset), fixed=T) | grepl('Stomach', colnames(working_dataset), fixed=T) | grepl('Thyroid', colnames(working_dataset), fixed=T) | grepl('Pancreas', colnames(working_dataset), fixed=T) | grepl('Spleen', colnames(working_dataset), fixed=T) | grepl('Muscle - Skeletal', colnames(working_dataset), fixed=T) | grepl('Pituitary', colnames(working_dataset), fixed=T) | grepl('Artery - Coronary', colnames(working_dataset), fixed=T) | grepl('Liver', colnames(working_dataset), fixed=T) | grepl('Kidney - Cortex', colnames(working_dataset), fixed=T) | grepl('Heart - Left Ventricle', colnames(working_dataset), fixed=T) | grepl('Colon - Transverse', colnames(working_dataset), fixed=T) | grepl('Colon - Sigmoid', colnames(working_dataset), fixed=T) | grepl('Adrenal Gland', colnames(working_dataset), fixed=T) |  grepl('Artery - Aorta', colnames(working_dataset), fixed=T),]
     
@@ -388,9 +387,9 @@ server <- function(input, output, session) {
     
     #tissue1 = tissue1[row.names(tissue1) %in% row.names(tissue2),]
     #tissue2 = tissue2[row.names(tissue2) %in% row.names(tissue1),]
-    progress$set(value = 3)
+    progress$set(value = 2)
     full_cors = bicorAndPvalue(tissue1, tissue2, use = 'p')
-    progress$set(value = 4)
+    progress$set(value = 3)
     cor_table = reshape2::melt(full_cors$bicor)
     new_p = reshape2::melt(full_cors$p)
     
@@ -406,7 +405,7 @@ server <- function(input, output, session) {
     cor_table$gene_symbol_1 = gsub("\\_.*","",cor_table$gene_tissue_1)
     cor_table$tissue_1 = gsub(".*_","",cor_table$gene_tissue_1)
     cor_table = cor_table[!is.na(cor_table$tissue_1),]
-    progress$set(value = 5)
+    progress$set(value = 4)
     cor_table$gene_symbol_2 = gsub("\\_.*","",cor_table$gene_tissue_2)
     cor_table$tissue_2 = gsub(".*_","",cor_table$gene_tissue_2)
     cor_table = cor_table[!is.na(cor_table$tissue_2),]
@@ -430,6 +429,7 @@ server <- function(input, output, session) {
       e_add_nested("itemStyle", color) %>%
       e_grid(bottom="150px") %>%
       e_x_axis(axisLabel = list(interval = 0, rotate = 45)) %>%
+      e_y_axis(name = "Bicor Values")%>%
       e_datazoom(type='inside') %>%
       e_toolbox(show=F) %>%
       e_tooltip(
@@ -453,6 +453,7 @@ server <- function(input, output, session) {
       e_add_nested("itemStyle", color) %>%
       e_grid(bottom="150px") %>%
       e_x_axis(axisLabel = list(interval = 0, rotate = 45)) %>%
+      e_y_axis(name = "Bicor Values")%>%
       e_datazoom(type='inside') %>%
       e_toolbox(show=F) %>%
       e_tooltip(
@@ -475,6 +476,7 @@ server <- function(input, output, session) {
       e_add_nested("itemStyle", color) %>%
       e_grid(bottom="100px") %>%
       e_x_axis(axisLabel = list(interval = 0, rotate = 45)) %>%
+      e_y_axis(name = "Bicor Values")%>%
       e_datazoom(type='inside') %>%
       e_toolbox(show=F) %>%
       e_tooltip(
@@ -609,12 +611,14 @@ server <- function(input, output, session) {
       
       enriched1<-f_e1(sig_table(),input$selected_tissue,input$selected_q)
       plots_en1<- enriched1 %>%
-        purrr::map(~plotEnrich(.x, showTerms = 10, numChar = 30, y = "Count", orderBy = "P.value"))
+        purrr::map(~plotEnrich(.x, showTerms = 10, numChar = 30, y = "Count", orderBy = "P.value") 
+                   + ggtitle(paste0('Positive gene correlations with ', input$origin_tissue, ' ', names(.x))))
       progress$set(value = 2)
       
       enriched2<-f_e2(sig_table(),input$selected_tissue,input$selected_q)
       plots_en2<- enriched2 %>%
-        purrr::map(~plotEnrich(.x, showTerms = 10, numChar = 30, y = "Count", orderBy = "P.value"))
+        purrr::map(~plotEnrich(.x, showTerms = 10, numChar = 30, y = "Count", orderBy = "P.value")
+                   + ggtitle(paste0('Negative gene correlations with ', input$origin_tissue, ' ', names(.x))))
       progress$set(value = 3)
       
       plots_all<-c(plots_en1,plots_en2)
