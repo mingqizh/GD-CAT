@@ -53,7 +53,7 @@ sidebar <- function(){
     ),
     radioButtons(inputId = "specie",label = "Chose a specie",choices = c("Human","Mouse")),
     radioButtons("Gender", "Chose Sex",c("Male"="male", "Female"="female", "Both"="both")),
-    textInput("origin_gene","origin_gene",value = "ADIPOQ"),
+    textInput("origin_gene","origin_gene, Official NBCI format gene name",value = "ADIPOQ"),
     selectInput(
       "origin_tissue",
       "Select a tissue",
@@ -78,7 +78,6 @@ sidebar <- function(){
         Pancreas = "Pancreas", 
         Pituitary = "Pituitary")
     ),
-    sliderInput(inputId = "topn",label = "How many top ranked genes that correlated with the tissue do you want to see?",value = 30, min = 1, max = 50),
     actionButton('import', class = "btn-primary", 'Process data')
   )
 }
@@ -91,10 +90,10 @@ t2<-function(){
               width = 12,
               tabPanel('All genes q<0.1', echarts4rOutput('plot.p1')),
               tabPanel('All genes q<0.01', echarts4rOutput('plot.p2')),
-              tabPanel('All genes q<0.001', echarts4rOutput('plot.p3')),
-              tabPanel('Origin-removed q<0.1', echarts4rOutput('plot.p4')),
-              tabPanel('Origin-removed q<0.01', echarts4rOutput('plot.p5')),
-              tabPanel('Origin-removed q<0.001', echarts4rOutput('plot.p6')),
+              tabPanel('All genes q<0.0001', echarts4rOutput('plot.p3')),
+              tabPanel('Origin-removed q<0.01', echarts4rOutput('plot.p4')),
+              tabPanel('Origin-removed q<0.001', echarts4rOutput('plot.p5')),
+              tabPanel('Origin-removed q<0.0001', echarts4rOutput('plot.p6')),
               tabPanel('Table-1',DTOutput('table.t1'))
             ),
             shinydashboard::box(
@@ -107,16 +106,18 @@ t2<-function(){
             tabBox(title="Cell type",width=12,height="500px",
                    tabPanel('Cell type',echarts4rOutput('cell'))
             ),
+            sliderInput(inputId = "topn",label = "How many top ranked genes that correlated with the tissue do you want to see?",value = 30, min = 1, max = 50),
             tabBox(title="Top-N",width=12,height="500px",
-                   
                    tabPanel('Top ranked genes',echarts4rOutput('plot.top1')),
                    tabPanel('Top ranked genes without origin tissue',echarts4rOutput('plot.top2'))
             ),
+            sliderInput(inputId = "within",label = "Within tissue genes numbers",value = 30, min = 1, max = 50),
+            sliderInput(inputId = "external",label = "External tissue genes numbers",value = 100, min = 1, max = 150),
             shinydashboard::box(
               title = "Network Analysis",
               width = 12,
-              sliderInput(inputId = "slicen",label = "slice n",value = 5, min = 1, max = 10),
               actionButton('btn1', class = "btn-primary", 'Start Analysis'),
+              tabPanel('Chart',plotOutput('net')),
               tabPanel('Chart',echarts4rOutput('plot.map3')),
               tabPanel('Table',DTOutput('table.map2'))
             )
@@ -182,13 +183,17 @@ f1<-function(annot){
 f2<-function(annot,origin_tissue){
   annot<-annot[!grepl(origin_tissue, annot$tissue_2),]
   sig_table = annot[annot$qvalue<0.1,]
-  sig_table$qcat =ifelse(sig_table$qvalue<0.01, 'q<0.01', 'q<0.1')
-  sig_table$qcat =ifelse(sig_table$qvalue<0.0001, 'q<0.0001', paste0(sig_table$qcat))
+  sig_table1 = annot[annot$qvalue<0.01,]
+  sig_table1$qcat = paste0(0.01)
+  sig_table2 = annot[annot$qvalue<0.001,]
+  sig_table2$qcat = paste0(0.001)
+  sig_table = as.data.frame(rbind(sig_table, sig_table1, sig_table2))
   
   binned_sig_prots= sig_table %>%
     dplyr::group_by(qcat, tissue_2) %>%
     dplyr::summarise(n = n()) %>%
-    dplyr::mutate(freq = n / sum(n))
+    dplyr::mutate(freq = n / sum(n))%>%
+    dplyr::arrange(desc(freq))
   
   
   tissue_freqs = binned_sig_prots %>% dplyr::group_by(qcat) %>% dplyr::summarise(sum(n))
@@ -230,7 +235,7 @@ f_e1 <- function(annot,select_tissue,q){
   pp1 = annot[annot$qvalue<as.numeric(q),]
   pp1 = pp1[pp1$bicor>0,]
   pp1 = pp1[pp1$tissue_2 %in% select_tissue,]
-  pp1_length = ifelse(length(row.names(pp1)) > 200, as.numeric(200), as.numeric(length(row.names(pp1))))
+  pp1_length = ifelse(length(row.names(pp1)) > 500, as.numeric(500), as.numeric(length(row.names(pp1))))
   pp2 = pp1[1:pp1_length,]
   gg1 = pp2$gene_symbol_2
   
@@ -246,7 +251,7 @@ f_e2 <- function(annot,select_tissue,q){
   pp1 = annot[annot$qvalue<as.numeric(q),]
   pp1 = pp1[pp1$bicor<0,]
   pp1 = pp1[pp1$tissue_2 %in% select_tissue,]
-  pp1_length = ifelse(length(row.names(pp1)) > 200, as.numeric(200), as.numeric(length(row.names(pp1))))
+  pp1_length = ifelse(length(row.names(pp1)) > 500, as.numeric(500), as.numeric(length(row.names(pp1))))
   pp2 = pp1[1:pp1_length,]
   gg1 = pp2$gene_symbol_2
   
@@ -329,7 +334,11 @@ get_map2<-function(working_dataset,sig_table,slicen,origin_gene_tissue){
   full_cors=NULL
   cor_table$pvalue = signif(new_p$value, 3)
   cor_table$bicor = round(cor_table$bicor, 3)
-  cor_table$qvalue = signif(p.adjust(cor_table$pvalue, "BH"), 3)
+  cor_pos_table = cor_table[cor_table$bicor>0,]
+  cor_pos_table$qvalue = signif(p.adjust(cor_pos_table$pvalue, "BH"), 3)
+  cor_neg_table = cor_table[cor_table$bicor<0,]
+  cor_neg_table$qvalue = signif(p.adjust(cor_neg_table$pvalue, "BH"), 3)
+  cor_table = as.data.frame(rbind(cor_pos_table, cor_neg_table))
   cor_table = cor_table[order(cor_table$qvalue, decreasing=F),]
   cor_table = na.omit(cor_table)
   cor_table$gene_symbol_1 = gsub("\\_.*","",cor_table$gene_tissue_1)
@@ -510,38 +519,163 @@ server <- function(input, output, session) {
   # qgraph(map2, minimum = 0.3, cut = 0.8, vsize = 3, color=cols_set$cols, legend = F, borders = TRUE, layout='spring', posCol = "dodgerblue3", negCol = "firebrick3", label.cex=3, directed=F, labels = colnames(map2)) + ggtitle(paste0('Undirected network for ', origin_gene_tissue, ' with labels')) 
     
   #})
-  map2<-eventReactive(input$btn1,{
+  #map2<-eventReactive(input$btn1,{
+  #  progress <- Progress$new(session, min=0, max=5)
+  #  on.exit(progress$close())
+  #  progress$set(message = 'Calculation in progress',
+  #               detail = 'This may take a while...')
+  #  progress$set(value = 1)
+  #  map1<-get_map2(working_dataset(),sig_table(),input$slicen,input$origin_gene_tissue)
+  #  progress$set(value = 2)
+  #  map2 = dcast(map1, gene_tissue_1 ~ gene_tissue_2, value.var = 'bicor', fun.aggregate = mean)
+  #  progress$set(value = 3)
+  #  row.names(map2) = map2$gene_tissue_1
+  #  progress$set(value = 4)
+  #  map2$gene_tissue_1 = NULL
+  #  map2
+  #})
+  #output$plot.map3<-renderEcharts4r({
+  # if (is.null(map2)) return()
+  # map2<-map2()
+  #
+  # map3<-map2 %>%
+  #   rownames_to_column('source') %>%
+  #   pivot_longer(cols = -source,names_to = 'target',values_to = 'bicor')
+  # map3 %>%
+  #   e_charts(source, width='500px', height = NULL) %>%
+  #   e_heatmap(target,bicor) %>%
+  #   e_visual_map(bicor) %>%
+  #   e_grid(top='20px',right='30px',left='20%',bottom='30%') %>%
+  #   e_x_axis(axisLabel = list(rotate = 45)) %>%
+  #   e_tooltip() %>%
+  #   e_toolbox_feature(feature = "saveAsImage",title='Save')
+  #}
+  #)
+  map3<-eventReactive(input$btn1,{
     progress <- Progress$new(session, min=0, max=5)
     on.exit(progress$close())
     progress$set(message = 'Calculation in progress',
                  detail = 'This may take a while...')
     progress$set(value = 1)
-    map1<-get_map2(working_dataset(),sig_table(),input$slicen,input$origin_gene_tissue)
+    
+    number_orig_gene = 50
+    number_peripheral_genes = 150
+    sig_table<-sig_table()
+    working_dataset<-working_dataset()
+    origin_tissue=input$origin_tissue
+    origin_gene_tissue = paste0(input$origin_gene, '_', input$origin_tissue)
+    col_scheme = rev(met.brewer('Austria', length(unique(sig_table$tissue_2))))
+    names(col_scheme) = unique(sig_table$tissue_2)
+    origin_pull = sig_table[sig_table$tissue_2==origin_tissue,]
+    orig_network_genes = as.vector(origin_pull$gene_tissue_2[1:number_orig_gene])
+    peripheral_pull = sig_table[!sig_table$tissue_2==origin_tissue,]
+    periph_network_genes = as.vector(peripheral_pull$gene_tissue_2[1:number_peripheral_genes])
+    sql_pull_list = c(origin_gene_tissue, orig_network_genes, periph_network_genes)
+    
     progress$set(value = 2)
-    map2 = dcast(map1, gene_tissue_1 ~ gene_tissue_2, value.var = 'bicor', fun.aggregate = mean)
+    
+    tissue1 <- working_dataset[, colnames(working_dataset)  %in% sql_pull_list]
+    full_cors = bicorAndPvalue(tissue1, tissue1, use = 'p')
+    cor_table = reshape2::melt(full_cors$bicor)
+    new_p = reshape2::melt(full_cors$p)
+    colnames(cor_table) = c('gene_tissue_1', 'gene_tissue_2', 'bicor')
+    
     progress$set(value = 3)
-    row.names(map2) = map2$gene_tissue_1
+    #can drop here to clear CPU
+    full_cors=NULL
+    cor_table$pvalue = signif(new_p$value, 3)
+    cor_table$bicor = round(cor_table$bicor, 3)
+    cor_table$qvalue = signif(p.adjust(cor_table$pvalue, "BH"), 3)
+    cor_table = cor_table[order(cor_table$qvalue, decreasing=F),]
+    cor_table = na.omit(cor_table)
+    cor_table$gene_symbol_1 = gsub("\\_.*","",cor_table$gene_tissue_1)
+    cor_table$tissue_1 = gsub(".*_","",cor_table$gene_tissue_1)
+    cor_table = cor_table[!is.na(cor_table$tissue_1),]
+    cor_table$gene_symbol_2 = gsub("\\_.*","",cor_table$gene_tissue_2)
+    cor_table$tissue_2 = gsub(".*_","",cor_table$gene_tissue_2)
+    cor_table = cor_table[!is.na(cor_table$tissue_2),]
+    sql_pull_2 = cor_table
+    
     progress$set(value = 4)
+    ######################################
+    #the new SQL pull table is not listed as sql_pull_2
+    #this will take work on your end to interface with pulling the correct genes from tissue_1 based on the number selected in the app.  I arbitrarily chose 10 here and you obviously wouldn't jsut apply top_n since it will differ.  The final list is called network_gene_lsit
+    map1 = sql_pull_2
+    map1$cols = col_scheme[match(map1$tissue_1, names(col_scheme))]
+    map2 = dcast(map1, gene_tissue_1 ~ gene_tissue_2, value.var = 'bicor', fun.aggregate = mean)
+    row.names(map2) = map2$gene_tissue_1
     map2$gene_tissue_1 = NULL
+    cols_set = as.data.frame(row.names(map2))
+    row.names(cols_set) = row.names(map2)
+    cols_set$cols = map1$cols[match(row.names(cols_set), map1$gene_tissue_1)]
+    cols_set$cols = ifelse(row.names(cols_set) %in% origin_gene_tissue, 'gray5', paste0(cols_set$cols))
     map2
+    
+    
   })
-  output$plot.map3<-renderEcharts4r({
-    if (is.null(map2)) return()
-    map2<-map2()
-
-    map3<-map2 %>%
-      rownames_to_column('source') %>%
-      pivot_longer(cols = -source,names_to = 'target',values_to = 'bicor')
-    map3 %>%
-      e_charts(source, width='500px', height = NULL) %>%
-      e_heatmap(target,bicor) %>%
-      e_visual_map(bicor) %>%
-      e_grid(top='20px',right='30px',left='20%',bottom='30%') %>%
-      e_x_axis(axisLabel = list(rotate = 45)) %>%
-      e_tooltip() %>%
-      e_toolbox_feature(feature = "saveAsImage",title='Save')
-  }
-  )
+  output$net<-renderPlot({
+    progress <- Progress$new(session, min=0, max=5)
+    on.exit(progress$close())
+    progress$set(message = 'Calculation in progress',
+                 detail = 'This may take a while...')
+    progress$set(value = 1)
+    
+    number_orig_gene =as.numeric(input$within) 
+    number_peripheral_genes =as.numeric(input$external) 
+    sig_table<-sig_table()
+    working_dataset<-working_dataset()
+    origin_tissue=input$origin_tissue
+    origin_gene_tissue = paste0(input$origin_gene, '_', input$origin_tissue)
+    col_scheme = rev(met.brewer('Austria', length(unique(sig_table$tissue_2))))
+    names(col_scheme) = unique(sig_table$tissue_2)
+    origin_pull = sig_table[sig_table$tissue_2==origin_tissue,]
+    orig_network_genes = as.vector(origin_pull$gene_tissue_2[1:number_orig_gene])
+    peripheral_pull = sig_table[!sig_table$tissue_2==origin_tissue,]
+    periph_network_genes = as.vector(peripheral_pull$gene_tissue_2[1:number_peripheral_genes])
+    sql_pull_list = c(origin_gene_tissue, orig_network_genes, periph_network_genes)
+    
+    progress$set(value = 2)
+    
+    tissue1 <- working_dataset[, colnames(working_dataset)  %in% sql_pull_list]
+    full_cors = bicorAndPvalue(tissue1, tissue1, use = 'p')
+    cor_table = reshape2::melt(full_cors$bicor)
+    new_p = reshape2::melt(full_cors$p)
+    colnames(cor_table) = c('gene_tissue_1', 'gene_tissue_2', 'bicor')
+    
+    progress$set(value = 3)
+    #can drop here to clear CPU
+    full_cors=NULL
+    cor_table$pvalue = signif(new_p$value, 3)
+    cor_table$bicor = round(cor_table$bicor, 3)
+    cor_table$qvalue = signif(p.adjust(cor_table$pvalue, "BH"), 3)
+    cor_table = cor_table[order(cor_table$qvalue, decreasing=F),]
+    cor_table = na.omit(cor_table)
+    cor_table$gene_symbol_1 = gsub("\\_.*","",cor_table$gene_tissue_1)
+    cor_table$tissue_1 = gsub(".*_","",cor_table$gene_tissue_1)
+    cor_table = cor_table[!is.na(cor_table$tissue_1),]
+    cor_table$gene_symbol_2 = gsub("\\_.*","",cor_table$gene_tissue_2)
+    cor_table$tissue_2 = gsub(".*_","",cor_table$gene_tissue_2)
+    cor_table = cor_table[!is.na(cor_table$tissue_2),]
+    sql_pull_2 = cor_table
+    
+    progress$set(value = 4)
+    ######################################
+    #the new SQL pull table is not listed as sql_pull_2
+    #this will take work on your end to interface with pulling the correct genes from tissue_1 based on the number selected in the app.  I arbitrarily chose 10 here and you obviously wouldn't jsut apply top_n since it will differ.  The final list is called network_gene_lsit
+    map1 = sql_pull_2
+    map1$cols = col_scheme[match(map1$tissue_1, names(col_scheme))]
+    map2 = dcast(map1, gene_tissue_1 ~ gene_tissue_2, value.var = 'bicor', fun.aggregate = mean)
+    row.names(map2) = map2$gene_tissue_1
+    map2$gene_tissue_1 = NULL
+    cols_set = as.data.frame(row.names(map2))
+    row.names(cols_set) = row.names(map2)
+    cols_set$cols = map1$cols[match(row.names(cols_set), map1$gene_tissue_1)]
+    cols_set$cols = ifelse(row.names(cols_set) %in% origin_gene_tissue, 'gray5', paste0(cols_set$cols))
+    
+    options(warn = -1)
+    
+    qgraph(map2, minimum = 0.3, cut = 0.8, vsize = 3, color=cols_set$cols, legend = F, borders = TRUE, layout='spring', posCol = "dodgerblue3", negCol = "firebrick3", label.cex=3, directed=F, labels = colnames(map2)) 
+  })
   #output$table.map2<-renderDT(
   #  get_map2(working_dataset(),sig_table(),input$slicen,input$origin_gene_tissue),
   # extensions = 'Buttons',
@@ -571,13 +705,13 @@ server <- function(input, output, session) {
     f2(sig_table(),input$origin_tissue)$echart
   })
   output$plot.p4 <- renderEcharts4r({
-    pie2()[[3]]
-  })
-  output$plot.p5 <- renderEcharts4r({
     pie2()[[2]]
   })
-  output$plot.p6 <- renderEcharts4r({
+  output$plot.p5 <- renderEcharts4r({
     pie2()[[1]]
+  })
+  output$plot.p6 <- renderEcharts4r({
+    pie2()[[3]]
   })
   # table
   table1<-reactive({
@@ -649,7 +783,7 @@ server <- function(input, output, session) {
   })
   output$download <- downloadHandler(
     filename = function() {
-      paste("Plots-", Sys.Date(), ".zip", sep="")
+      paste("Enrichement-", Sys.Date(), ".zip", sep="")
     },
     content = function(file) {
       owd <- setwd(tempdir())
