@@ -30,6 +30,7 @@ library(MetBrewer)
 library(feather)
 library(tidyr)
 library(tibble)
+library(webshot)
 allowWGCNAThreads()
 
 header <- function(){
@@ -81,7 +82,7 @@ t2<-function(){
             tabBox(
               title = "Pie Chart",
               width = 12,
-              tabPanel('All genes q<0.1', echarts4rOutput('plot.p1')),
+              tabPanel('All genes q<0.1', echarts4rOutput('plot.p1'),downloadButton("p1", "Download PDF"),),
               tabPanel('All genes q<0.01', echarts4rOutput('plot.p2')),
               tabPanel('All genes q<0.0001', echarts4rOutput('plot.p3')),
               tabPanel('Origin-removed q<0.01', echarts4rOutput('plot.p4')),
@@ -111,7 +112,7 @@ t2<-function(){
               width = 12,
               actionButton('btn1', class = "btn-primary", 'Start Analysis'),
               tabPanel('Chart',plotOutput('net')),
-              downloadButton("savePlot"),
+              downloadButton("PDFPlot", "Download PDF"),
               tabPanel('Chart',echarts4rOutput('plot.map3')),
               tabPanel('Table',DTOutput('table.map2'))
             )
@@ -263,9 +264,7 @@ f_e2 <- function(annot,select_tissue,q){
 }
 
 
-get_cell<-function(working_dataset, sig_table, origin_gene, origin_tissue){
-  col_scheme = rev(met.brewer('Austria', length(unique(sig_table$tissue_2))))
-  names(col_scheme) = unique(sig_table$tissue_2)
+get_cell<-function(working_dataset, sig_table, origin_gene, origin_tissue,col_scheme){
   #read in sc-seq matrix 
   sc_matrix = read.csv('C:/Users/mingqiz7/Desktop/GTEx app/data/full pan-tissue DECON abundances.csv')
   origin_gene_tissue = paste0(origin_gene, '_', origin_tissue)
@@ -295,71 +294,18 @@ get_cell<-function(working_dataset, sig_table, origin_gene, origin_tissue){
   top_genes2$color = col_scheme[match(top_genes2$tissue, names(col_scheme))]
   top_genes2 = top_genes2[order(abs(top_genes2$bicor), decreasing = T),]
 }
-get_top_genes1<-function(sig_table,max_gene_length){
-  col_scheme = rev(met.brewer('Austria', length(unique(sig_table$tissue_2))))
-  names(col_scheme) = unique(sig_table$tissue_2)
+get_top_genes1<-function(sig_table,max_gene_length, col_scheme){
   top_genes = sig_table[1:max_gene_length,]
   top_genes$color = col_scheme[match(top_genes$tissue_2, names(col_scheme))]
   top_genes
 }
-get_top_genes2<-function(sig_table,max_gene_length,origin_tissue){
-  col_scheme = rev(met.brewer('Austria', length(unique(sig_table$tissue_2))))
-  names(col_scheme) = unique(sig_table$tissue_2)
+get_top_genes2<-function(sig_table,max_gene_length,origin_tissue, col_scheme){
   
   sig_table1 = sig_table[!sig_table$tissue_2 %in% origin_tissue,]
   top_genes = sig_table1[1:max_gene_length,]
   top_genes$color = col_scheme[match(top_genes$tissue_2, names(col_scheme))]
   
   top_genes
-}
-get_map2<-function(working_dataset,sig_table,slicen,origin_gene_tissue){
-  col_scheme = rev(met.brewer('Austria', length(unique(sig_table$tissue_2))))
-  names(col_scheme) = unique(sig_table$tissue_2)
-  network_genes = sig_table %>%
-    group_by(tissue_2) %>%
-    top_n(200, gene_tissue_2)
-  
-  sql_pull_list = c(as.vector(network_genes$gene_tissue_2), origin_gene_tissue)
-  
-  ######################
-  #I reran cors for these but skip to line 283
-  tissue1 <- working_dataset[, colnames(working_dataset)  %in% sql_pull_list]
-  full_cors = bicorAndPvalue(tissue1, tissue1, use = 'p')
-  cor_table = reshape2::melt(full_cors$bicor)
-  new_p = reshape2::melt(full_cors$p)
-  colnames(cor_table) = c('gene_tissue_1', 'gene_tissue_2', 'bicor')
-  #can drop here to clear CPU
-  full_cors=NULL
-  cor_table$pvalue = signif(new_p$value, 3)
-  cor_table$bicor = round(cor_table$bicor, 3)
-  cor_pos_table = cor_table[cor_table$bicor>0,]
-  cor_pos_table$qvalue = signif(p.adjust(cor_pos_table$pvalue, "BH"), 3)
-  cor_neg_table = cor_table[cor_table$bicor<0,]
-  cor_neg_table$qvalue = signif(p.adjust(cor_neg_table$pvalue, "BH"), 3)
-  cor_table = as.data.frame(rbind(cor_pos_table, cor_neg_table))
-  cor_table = cor_table[order(cor_table$qvalue, decreasing=F),]
-  cor_table = na.omit(cor_table)
-  cor_table$gene_symbol_1 = gsub("\\_.*","",cor_table$gene_tissue_1)
-  cor_table$tissue_1 = gsub(".*_","",cor_table$gene_tissue_1)
-  cor_table = cor_table[!is.na(cor_table$tissue_1),]
-  cor_table$gene_symbol_2 = gsub("\\_.*","",cor_table$gene_tissue_2)
-  cor_table$tissue_2 = gsub(".*_","",cor_table$gene_tissue_2)
-  cor_table = cor_table[!is.na(cor_table$tissue_2),]
-  sql_pull_2 = cor_table
-  
-  ######################################
-  #è¿éå ä¸ä¸ªslider bar éæ©slice(1:5)éç5 èå´æ¯1-10
-  network_gene_list = sql_pull_2 %>%
-    group_by(tissue_1) %>%
-    slice(1:slicen)
-  
-  
-  network_plot_table = sql_pull_2[sql_pull_2$gene_tissue_1 %in% network_gene_list$gene_tissue_1,]
-  network_plot_table = network_plot_table[network_plot_table$gene_tissue_2 %in% network_gene_list$gene_tissue_1,]
-  
-  map1 = network_plot_table
-  map1$cols = col_scheme[match(map1$tissue_1, names(col_scheme))]
-  map1
 }
 
 server <- function(input, output, session) {
@@ -380,7 +326,7 @@ server <- function(input, output, session) {
     progress <- Progress$new(session, min=0, max=5)
     on.exit(progress$close())
     progress$set(message = 'Pre-processing raw data',
-                 detail = 'It will take around 2 mins')
+                 detail = 'It will take around 2 mins, please be patient')
     progress$set(value = 1)
     origin_gene = input$origin_gene
     origin_tissue = input$origin_tissue
@@ -427,13 +373,13 @@ server <- function(input, output, session) {
   })
   col_scheme<-reactive({
     sig_table<-sig_table()
-    col_scheme = rev(met.brewer('Austria', length(unique(sig_table$tissue_2))))
+    col_scheme = rev(met.brewer('Signac', length(unique(sig_table$tissue_2))))
     names(col_scheme) = unique(sig_table$tissue_2)
     col_scheme
   }) 
   #cell type
   output$cell<- renderEcharts4r({
-    top_genes1<-get_cell(working_dataset(),sig_table(), input$origin_gene, input$origin_tissue)
+    top_genes1<-get_cell(working_dataset(),sig_table(), input$origin_gene, input$origin_tissue, col_scheme())
     
     top_genes1 %>%
       arrange(desc(abs(bicor))) %>%
@@ -457,7 +403,7 @@ server <- function(input, output, session) {
   )
   # top n
   output$plot.top1<- renderEcharts4r({
-    top_genes1<-get_top_genes1(sig_table(),input$topn)
+    top_genes1<-get_top_genes1(sig_table(),input$topn, col_scheme())
     
     top_genes1 %>%
       arrange(desc(abs(bicor))) %>%
@@ -480,7 +426,7 @@ server <- function(input, output, session) {
   }
   )
   output$plot.top2<- renderEcharts4r({
-    top_genes2<-get_top_genes2(sig_table(),input$topn,input$origin_tissue)
+    top_genes2<-get_top_genes2(sig_table(),input$topn,input$origin_tissue, col_scheme())
     
     top_genes2 %>%
       arrange(desc(abs(bicor))) %>%
@@ -503,15 +449,11 @@ server <- function(input, output, session) {
   }
   )
  
-  values <- reactiveValues(
-    plot = NULL
-  )
- 
-  output$net<-renderPlot({
+  net<-reactive({
     progress <- Progress$new(session, min=0, max=5)
     on.exit(progress$close())
-    progress$set(message = 'Calculation in progress',
-                 detail = 'This may take a while...')
+    progress$set(message = 'Gnerating network',
+                 detail = 'Just a second')
     progress$set(value = 1)
     
     number_orig_gene =as.numeric(input$within) 
@@ -520,8 +462,7 @@ server <- function(input, output, session) {
     working_dataset<-working_dataset()
     origin_tissue=input$origin_tissue
     origin_gene_tissue = paste0(input$origin_gene, '_', input$origin_tissue)
-    col_scheme = rev(met.brewer('Austria', length(unique(sig_table$tissue_2))))
-    names(col_scheme) = unique(sig_table$tissue_2)
+    col_scheme<- col_scheme()
     origin_pull = sig_table[sig_table$tissue_2==origin_tissue,]
     orig_network_genes = as.vector(origin_pull$gene_tissue_2[1:number_orig_gene])
     peripheral_pull = sig_table[!sig_table$tissue_2==origin_tissue,]
@@ -566,11 +507,21 @@ server <- function(input, output, session) {
     cols_set$cols = map1$cols[match(row.names(cols_set), map1$gene_tissue_1)]
     cols_set$cols = ifelse(row.names(cols_set) %in% origin_gene_tissue, 'gray5', paste0(cols_set$cols))
     
-    options(warn = -1)
-    
     qgraph(map2, minimum = 0.3, cut = 0.8, vsize = 3, color=cols_set$cols, legend = F, borders = TRUE, layout='spring', posCol = "dodgerblue3", negCol = "firebrick3", label.cex=4, directed=F, labels = colnames(map2)) 
   })
-  
+  output$net<-renderPlot({
+    net()
+  })
+  output$PDFPlot <- downloadHandler(
+    filename = function() {
+      paste("Net-", Sys.Date(), ".pdf", sep="")
+    },
+    content = function(file) {
+        pdf(file)
+        plot(net())
+        dev.off()
+    }
+  )
   #output$table.map2<-renderDT(
   #  get_map2(working_dataset(),sig_table(),input$slicen,input$origin_gene_tissue),
   # extensions = 'Buttons',
@@ -590,6 +541,18 @@ server <- function(input, output, session) {
   output$plot.p1 <- renderEcharts4r({
     pie1()[[3]]
   })
+  output$p1 <- downloadHandler(
+    filename = function() {
+      paste("Pie-", Sys.Date(), ".pdf", sep="")
+    },
+    content = function(file) {
+      session$onSessionEnded(function() {
+        file.remove(file)
+      })
+      webshot(echarts4r::e_render_proxy(output$plot.p1), file, delay = 0)
+      list(content = file, type = "application/pdf")
+    }
+  )
   output$plot.p2 <- renderEcharts4r({
     pie1()[[2]]
   })
@@ -634,8 +597,8 @@ server <- function(input, output, session) {
     if(!is.null(input$selected_tissue)){
       progress <- Progress$new(session, min=0, max=5)
       on.exit(progress$close())
-      progress$set(message = 'Calculation in progress',
-                   detail = 'This may take a while...')
+      progress$set(message = 'Gnerating the enrichement',
+                   detail = 'Just wait a second')
       progress$set(value = 1)
       
       enriched1<-f_e1(sig_table(),input$selected_tissue,input$selected_q)
@@ -685,9 +648,11 @@ server <- function(input, output, session) {
       on.exit(setwd(owd))
       plots<-plots()
       for(i in 1:length(plots)){
-        ggsave( paste0('plot',i,'.png'), plot = plots[[i]], device = "png")
+        pdf(file)
+        plot(plots[[i]])
+        dev.off()
       }
-      zip::zip(file,paste0('plot',1:length(plots),'.png'))
+      zip::zip(file,paste0('plot',1:length(plots),'.pdf'))
     }
   )
   # tips
