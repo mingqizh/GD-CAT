@@ -11,11 +11,16 @@ library(DT)
 library(zip)
 library(reticulate)
 library(Rcpp)
+#library(Seurat)
 library(reshape2)
 library(colormap)
+#library(bnlearn)
+#library(bnstruct)
 library(patchwork)
+#library(limma)
 library(qgraph)
 library(devtools)
+#library(ADAPTS)
 library(preprocessCore)
 library(pheatmap)
 library(WGCNA)
@@ -259,14 +264,18 @@ f_e2 <- function(annot,select_tissue,q){
 
 
 get_cell<-function(working_dataset, sig_table){
+  col_scheme = rev(met.brewer('Austria', length(unique(sig_table$tissue_2))))
+  names(col_scheme) = unique(sig_table$tissue_2)
   #read in sc-seq matrix 
   sc_matrix = read.csv('C:/Users/mingqiz7/Desktop/GTEx app/data/full pan-tissue DECON abundances.csv')
-  
+  origin_gene = input$origin_gene
+  origin_tissue = input$origin_tissue
+  origin_gene_tissue = paste0(origin_gene, '_', origin_tissue)
   #filter sc-seq matrix based on working_dataset object 
   row.names(sc_matrix) = sc_matrix$GTExID
   sc_matrix$GTExID = NULL
   sc_matrix = sc_matrix[row.names(sc_matrix) %in% row.names(working_dataset),]
-  tissue1 <- working_dataset[,grepl('ADIPOQ_Adipose - Subcutaneous', colnames(working_dataset), fixed=T)]
+  tissue1 <- working_dataset[,grepl(origin_gene_tissue, colnames(working_dataset), fixed=T)]
   
   full_cors_sc = bicorAndPvalue(tissue1, sc_matrix, use = 'p')
   cor_table_sc = reshape2::melt(full_cors_sc$bicor)
@@ -289,11 +298,16 @@ get_cell<-function(working_dataset, sig_table){
   top_genes2 = top_genes2[order(abs(top_genes2$bicor), decreasing = T),]
 }
 get_top_genes1<-function(sig_table,max_gene_length){
+  col_scheme = rev(met.brewer('Austria', length(unique(sig_table$tissue_2))))
+  names(col_scheme) = unique(sig_table$tissue_2)
   top_genes = sig_table[1:max_gene_length,]
   top_genes$color = col_scheme[match(top_genes$tissue_2, names(col_scheme))]
   top_genes
 }
 get_top_genes2<-function(sig_table,max_gene_length,origin_tissue){
+  col_scheme = rev(met.brewer('Austria', length(unique(sig_table$tissue_2))))
+  names(col_scheme) = unique(sig_table$tissue_2)
+  
   sig_table1 = sig_table[!sig_table$tissue_2 %in% origin_tissue,]
   top_genes = sig_table1[1:max_gene_length,]
   top_genes$color = col_scheme[match(top_genes$tissue_2, names(col_scheme))]
@@ -301,6 +315,8 @@ get_top_genes2<-function(sig_table,max_gene_length,origin_tissue){
   top_genes
 }
 get_map2<-function(working_dataset,sig_table,slicen,origin_gene_tissue){
+  col_scheme = rev(met.brewer('Austria', length(unique(sig_table$tissue_2))))
+  names(col_scheme) = unique(sig_table$tissue_2)
   network_genes = sig_table %>%
     group_by(tissue_2) %>%
     top_n(200, gene_tissue_2)
@@ -350,7 +366,7 @@ get_map2<-function(working_dataset,sig_table,slicen,origin_gene_tissue){
 
 server <- function(input, output, session) {
   working_dataset<-eventReactive(input$import,{
-    load("C:/Users/mingqiz7/Desktop/GTEx app/data/working_dataset_withcols.RData")
+    load("C:/Users/mingqiz7/Desktop/GTEx app/data/working_dataset.RData")
     if(input$Gender == "both"){
         working_dataset<-both
       }else if(input$Gender == "male"){
@@ -548,6 +564,8 @@ server <- function(input, output, session) {
     working_dataset<-working_dataset()
     origin_tissue=input$origin_tissue
     origin_gene_tissue = paste0(input$origin_gene, '_', input$origin_tissue)
+    col_scheme = rev(met.brewer('Austria', length(unique(sig_table$tissue_2))))
+    names(col_scheme) = unique(sig_table$tissue_2)
     origin_pull = sig_table[sig_table$tissue_2==origin_tissue,]
     orig_network_genes = as.vector(origin_pull$gene_tissue_2[1:number_orig_gene])
     peripheral_pull = sig_table[!sig_table$tissue_2==origin_tissue,]
@@ -656,7 +674,7 @@ server <- function(input, output, session) {
     
     options(warn = -1)
     
-    qgraph(map2, minimum = 0.3, cut = 0.8, vsize = 3, color=cols_set$cols, legend = F, borders = TRUE, layout='spring', posCol = "dodgerblue3", negCol = "firebrick3", label.cex=3, directed=F, labels = colnames(map2)) 
+    qgraph(map2, minimum = 0.3, cut = 0.8, vsize = 3, color=cols_set$cols, legend = F, borders = TRUE, layout='spring', posCol = "dodgerblue3", negCol = "firebrick3", label.cex=4, directed=F, labels = colnames(map2)) 
   })
   #output$table.map2<-renderDT(
   #  get_map2(working_dataset(),sig_table(),input$slicen,input$origin_gene_tissue),
@@ -734,7 +752,7 @@ server <- function(input, output, session) {
       enriched2<-f_e2(sig_table(),input$selected_tissue,input$selected_q)
       plots_en2<- enriched2 %>%
         purrr::map(~plotEnrich(.x, showTerms = 10, numChar = 30, y = "Count", orderBy = "P.value")
-                   + ggtitle(paste0('Negative gene correlations with ',  input$origin_gene, ' ', names(.x))))
+                   + ggtitle(paste0('Negative gene correlations with ', input$origin_gene, ' ', names(.x))))
       progress$set(value = 3)
       
       plots_all<-c(plots_en1,plots_en2)
