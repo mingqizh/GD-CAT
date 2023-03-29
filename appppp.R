@@ -30,7 +30,6 @@ library(MetBrewer)
 library(feather)
 library(tidyr)
 library(tibble)
-library(webshot)
 allowWGCNAThreads()
 
 header <- function(){
