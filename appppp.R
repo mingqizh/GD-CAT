@@ -11,16 +11,11 @@ library(DT)
 library(zip)
 library(reticulate)
 library(Rcpp)
-library(Seurat)
 library(reshape2)
 library(colormap)
-library(bnlearn)
-library(bnstruct)
 library(patchwork)
-library(limma)
 library(qgraph)
 library(devtools)
-library(ADAPTS)
 library(preprocessCore)
 library(pheatmap)
 library(WGCNA)
@@ -36,11 +31,9 @@ library(feather)
 library(tidyr)
 library(tibble)
 allowWGCNAThreads()
-load("C:/Users/mingqiz7/Desktop/GTEx app/data/working_dataset.RData")
-
 
 header <- function(){
-  dashboardHeader(title = "Welcome to the GTEx Shiny App!")
+  dashboardHeader(title = "Welcome to GD-CAT!")
 }
 
 sidebar <- function(){
@@ -51,9 +44,9 @@ sidebar <- function(){
       menuItem("Instruction",  tabName = "t2",icon = icon("dashboard")),
       menuItem("Settings",  tabName = "t2",icon = icon("dashboard"))
     ),
-    radioButtons(inputId = "specie",label = "Chose a specie",choices = c("Human","Mouse")),
+    radioButtons(inputId = "specie",label = "Chose a species",choices = c("Human","Mouse")),
     radioButtons("Gender", "Chose Sex",c("Male"="male", "Female"="female", "Both"="both")),
-    textInput("origin_gene","origin_gene, Official NBCI format gene name",value = "ADIPOQ"),
+    textInput("origin_gene","origin_gene, Official NBCI gene symbol",value = "ADIPOQ"),
     selectInput(
       "origin_tissue",
       "Select a tissue",
@@ -106,13 +99,13 @@ t2<-function(){
             tabBox(title="Cell type",width=12,height="500px",
                    tabPanel('Cell type',echarts4rOutput('cell'))
             ),
-            sliderInput(inputId = "topn",label = "How many top ranked genes that correlated with the tissue do you want to see?",value = 30, min = 1, max = 50),
+            sliderInput(inputId = "topn",label = "How many top ranked co-correlated genes do you want to see?",value = 30, min = 1, max = 50),
             tabBox(title="Top-N",width=12,height="500px",
-                   tabPanel('Top ranked genes',echarts4rOutput('plot.top1')),
-                   tabPanel('Top ranked genes without origin tissue',echarts4rOutput('plot.top2'))
+                   tabPanel('Top-ranked genes',echarts4rOutput('plot.top1')),
+                   tabPanel('Top-ranked genes without origin tissue',echarts4rOutput('plot.top2'))
             ),
-            sliderInput(inputId = "within",label = "Within tissue genes numbers",value = 30, min = 1, max = 50),
-            sliderInput(inputId = "external",label = "External tissue genes numbers",value = 100, min = 1, max = 150),
+            sliderInput(inputId = "within",label = "Within tissue gene numbers",value = 30, min = 1, max = 50),
+            sliderInput(inputId = "external",label = "Peripheral tissue gene numbers",value = 100, min = 1, max = 150),
             shinydashboard::box(
               title = "Network Analysis",
               width = 12,
@@ -266,8 +259,6 @@ f_e2 <- function(annot,select_tissue,q){
 
 
 get_cell<-function(working_dataset, sig_table){
-  col_scheme = rev(met.brewer('Austria', length(unique(sig_table$tissue_2))))
-  names(col_scheme) = unique(sig_table$tissue_2)
   #read in sc-seq matrix 
   sc_matrix = read.csv('C:/Users/mingqiz7/Desktop/GTEx app/data/full pan-tissue DECON abundances.csv')
   
@@ -298,16 +289,11 @@ get_cell<-function(working_dataset, sig_table){
   top_genes2 = top_genes2[order(abs(top_genes2$bicor), decreasing = T),]
 }
 get_top_genes1<-function(sig_table,max_gene_length){
-  col_scheme = rev(met.brewer('Austria', length(unique(sig_table$tissue_2))))
-  names(col_scheme) = unique(sig_table$tissue_2)
   top_genes = sig_table[1:max_gene_length,]
   top_genes$color = col_scheme[match(top_genes$tissue_2, names(col_scheme))]
   top_genes
 }
 get_top_genes2<-function(sig_table,max_gene_length,origin_tissue){
-  col_scheme = rev(met.brewer('Austria', length(unique(sig_table$tissue_2))))
-  names(col_scheme) = unique(sig_table$tissue_2)
-  
   sig_table1 = sig_table[!sig_table$tissue_2 %in% origin_tissue,]
   top_genes = sig_table1[1:max_gene_length,]
   top_genes$color = col_scheme[match(top_genes$tissue_2, names(col_scheme))]
@@ -315,8 +301,6 @@ get_top_genes2<-function(sig_table,max_gene_length,origin_tissue){
   top_genes
 }
 get_map2<-function(working_dataset,sig_table,slicen,origin_gene_tissue){
-  col_scheme = rev(met.brewer('Austria', length(unique(sig_table$tissue_2))))
-  names(col_scheme) = unique(sig_table$tissue_2)
   network_genes = sig_table %>%
     group_by(tissue_2) %>%
     top_n(200, gene_tissue_2)
@@ -366,7 +350,7 @@ get_map2<-function(working_dataset,sig_table,slicen,origin_gene_tissue){
 
 server <- function(input, output, session) {
   working_dataset<-eventReactive(input$import,{
-    load("C:/Users/mingqiz7/Desktop/GTEx app/data/working_dataset.RData")
+    load("C:/Users/mingqiz7/Desktop/GTEx app/data/working_dataset_withcols.RData")
     if(input$Gender == "both"){
         working_dataset<-both
       }else if(input$Gender == "male"){
@@ -564,8 +548,6 @@ server <- function(input, output, session) {
     working_dataset<-working_dataset()
     origin_tissue=input$origin_tissue
     origin_gene_tissue = paste0(input$origin_gene, '_', input$origin_tissue)
-    col_scheme = rev(met.brewer('Austria', length(unique(sig_table$tissue_2))))
-    names(col_scheme) = unique(sig_table$tissue_2)
     origin_pull = sig_table[sig_table$tissue_2==origin_tissue,]
     orig_network_genes = as.vector(origin_pull$gene_tissue_2[1:number_orig_gene])
     peripheral_pull = sig_table[!sig_table$tissue_2==origin_tissue,]
@@ -746,13 +728,13 @@ server <- function(input, output, session) {
       enriched1<-f_e1(sig_table(),input$selected_tissue,input$selected_q)
       plots_en1<- enriched1 %>%
         purrr::map(~plotEnrich(.x, showTerms = 10, numChar = 30, y = "Count", orderBy = "P.value") 
-                   + ggtitle(paste0('Positive gene correlations with ', input$origin_tissue, ' ', names(.x))))
+                   + ggtitle(paste0('Positive gene correlations with ', input$origin_gene, ' ', names(.x))))
       progress$set(value = 2)
       
       enriched2<-f_e2(sig_table(),input$selected_tissue,input$selected_q)
       plots_en2<- enriched2 %>%
         purrr::map(~plotEnrich(.x, showTerms = 10, numChar = 30, y = "Count", orderBy = "P.value")
-                   + ggtitle(paste0('Negative gene correlations with ', input$origin_tissue, ' ', names(.x))))
+                   + ggtitle(paste0('Negative gene correlations with ',  input$origin_gene, ' ', names(.x))))
       progress$set(value = 3)
       
       plots_all<-c(plots_en1,plots_en2)
