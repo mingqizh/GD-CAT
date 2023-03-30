@@ -640,18 +640,16 @@ server <- function(input, output, session) {
   })
   output$download <- downloadHandler(
     filename = function() {
-      paste("Enrichement-", Sys.Date(), ".zip", sep="")
+      paste("Plots-", Sys.Date(), ".zip", sep="")
     },
     content = function(file) {
       owd <- setwd(tempdir())
       on.exit(setwd(owd))
       plots<-plots()
       for(i in 1:length(plots)){
-        pdf(file)
-        plot(plots[[i]])
-        dev.off()
+        ggsave( paste0('plot',i,'.png'), plot = plots[[i]], device = "png")
       }
-      zip::zip(file,paste0('plot',1:length(plots),'.pdf'))
+      zip::zip(file,paste0('plot',1:length(plots),'.png'))
     }
   )
   # tips
