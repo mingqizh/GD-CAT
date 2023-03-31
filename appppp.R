@@ -1,5 +1,6 @@
 library(shiny)
 library(shinydashboard)
+library(shinyalert)
 library(dplyr)
 library(purrr)
 library(ggplot2)
@@ -30,6 +31,7 @@ library(MetBrewer)
 library(feather)
 library(tidyr)
 library(tibble)
+library(webshot)
 allowWGCNAThreads()
 
 header <- function(){
@@ -81,7 +83,7 @@ t2<-function(){
             tabBox(
               title = "Pie Chart",
               width = 12,
-              tabPanel('All genes q<0.1', echarts4rOutput('plot.p1'),downloadButton("p1", "Download PDF"),),
+              tabPanel('All genes q<0.1', echarts4rOutput('plot.p1')),
               tabPanel('All genes q<0.01', echarts4rOutput('plot.p2')),
               tabPanel('All genes q<0.001', echarts4rOutput('plot.p3')),
               tabPanel('Origin-removed q<0.01', echarts4rOutput('plot.p4')),
@@ -271,7 +273,7 @@ get_cell<-function(working_dataset, sig_table, origin_gene, origin_tissue,col_sc
   row.names(sc_matrix) = sc_matrix$GTExID
   sc_matrix$GTExID = NULL
   sc_matrix = sc_matrix[row.names(sc_matrix) %in% row.names(working_dataset),]
-  tissue1 <- working_dataset[,grepl(origin_gene_tissue, colnames(working_dataset), fixed=T)]
+  tissue1 <- working_dataset[,colnames(working_dataset) %in% origin_gene_tissue]
   
   full_cors_sc = bicorAndPvalue(tissue1, sc_matrix, use = 'p')
   cor_table_sc = reshape2::melt(full_cors_sc$bicor)
@@ -310,7 +312,8 @@ get_top_genes2<-function(sig_table,max_gene_length,origin_tissue, col_scheme){
 server <- function(input, output, session) {
   working_dataset<-eventReactive(input$import,{
     load("C:/Users/mingqiz7/Desktop/GTEx app/data/working_dataset.RData")
-    if(input$Gender == "both"){
+    isolate({
+      if(input$Gender == "both"){
         working_dataset<-both
       }else if(input$Gender == "male"){
         working_dataset<-male
@@ -318,6 +321,7 @@ server <- function(input, output, session) {
         working_dataset<-female
       }
       working_dataset
+    })
   })
 
   
@@ -327,14 +331,17 @@ server <- function(input, output, session) {
     progress$set(message = 'Pre-processing raw data',
                  detail = 'It will take around 2 mins, please be patient')
     progress$set(value = 1)
-    origin_gene = input$origin_gene
-    origin_tissue = input$origin_tissue
-    origin_gene_tissue = paste0(origin_gene, '_', origin_tissue)
-    working_dataset<-working_dataset()
+    isolate({
+      origin_gene = input$origin_gene
+      origin_tissue = input$origin_tissue
+      origin_gene_tissue = paste0(origin_gene, '_', origin_tissue)
+      working_dataset<-working_dataset()
+    })
+    
     tissue2 <- working_dataset[,grepl('Adipose - Subcutaneous', colnames(working_dataset)) | grepl('Adipose - Visceral (Omentum)', colnames(working_dataset), fixed=T) | grepl('Brain - Hypothalamus', colnames(working_dataset)) | grepl('Brain - Hippocampus', colnames(working_dataset)) | grepl('Small Intestine - Terminal Ileum', colnames(working_dataset), fixed=T) | grepl('Stomach', colnames(working_dataset), fixed=T) | grepl('Thyroid', colnames(working_dataset), fixed=T) | grepl('Pancreas', colnames(working_dataset), fixed=T) | grepl('Spleen', colnames(working_dataset), fixed=T) | grepl('Muscle - Skeletal', colnames(working_dataset), fixed=T) | grepl('Pituitary', colnames(working_dataset), fixed=T) | grepl('Artery - Coronary', colnames(working_dataset), fixed=T) | grepl('Liver', colnames(working_dataset), fixed=T) | grepl('Kidney - Cortex', colnames(working_dataset), fixed=T) | grepl('Heart - Left Ventricle', colnames(working_dataset), fixed=T) | grepl('Colon - Transverse', colnames(working_dataset), fixed=T) | grepl('Colon - Sigmoid', colnames(working_dataset), fixed=T) | grepl('Adrenal Gland', colnames(working_dataset), fixed=T) |  grepl('Artery - Aorta', colnames(working_dataset), fixed=T),]
     
     
-    tissue1 <- working_dataset[,grepl(origin_gene_tissue, colnames(working_dataset), fixed=T)]
+    tissue1 <- working_dataset[,colnames(working_dataset) %in% origin_gene_tissue]
     
     
     #tissue1 = tissue1[row.names(tissue1) %in% row.names(tissue2),]
@@ -371,12 +378,17 @@ server <- function(input, output, session) {
     sig_table
     
   })
-  col_scheme<-reactive({
+  tryCatch({
+    col_scheme<-reactive({
     sig_table<-sig_table()
     col_scheme = rev(met.brewer('Signac', length(unique(sig_table$tissue_2))))
     names(col_scheme) = unique(sig_table$tissue_2)
     col_scheme
   }) 
+  }, warning = function(w) {
+    shinyalert("Warning!","Message to explain this", type = "warning")
+  })
+  
   #cell type
   output$cell<- renderEcharts4r({
     top_genes1<-get_cell(working_dataset(),sig_table(), input$origin_gene, input$origin_tissue, col_scheme())
@@ -449,19 +461,22 @@ server <- function(input, output, session) {
   }
   )
  
-  net<-reactive({
+  net<-eventReactive(input$btn1,{
     progress <- Progress$new(session, min=0, max=5)
     on.exit(progress$close())
-    progress$set(message = 'Gnerating network',
-                 detail = 'Just a second')
+    progress$set(message = 'Gnerating the enrichement',
+                 detail = 'Just wait a second')
     progress$set(value = 1)
-    
-    number_orig_gene =as.numeric(input$within) 
+    isolate({
+      number_orig_gene =as.numeric(input$within) 
     number_peripheral_genes =as.numeric(input$external) 
     sig_table<-sig_table()
     working_dataset<-working_dataset()
+    origin_gene<-input$origin_gene
     origin_tissue=input$origin_tissue
-    origin_gene_tissue = paste0(input$origin_gene, '_', input$origin_tissue)
+    })
+    
+    origin_gene_tissue = paste0(origin_gene, '_', origin_tissue)
     col_scheme<- col_scheme()
     origin_pull = sig_table[sig_table$tissue_2==origin_tissue,]
     orig_network_genes = as.vector(origin_pull$gene_tissue_2[1:number_orig_gene])
@@ -547,11 +562,7 @@ server <- function(input, output, session) {
       paste("Pie-", Sys.Date(), ".pdf", sep="")
     },
     content = function(file) {
-      session$onSessionEnded(function() {
-        file.remove(file)
-      })
-      webshot(echarts4r::e_render_proxy(output$plot.p1), file, delay = 0)
-      list(content = file, type = "application/pdf")
+      webshot(pie1()[[3]]$html, file)
     }
   )
   output$plot.p2 <- renderEcharts4r({
@@ -572,6 +583,7 @@ server <- function(input, output, session) {
   output$plot.p6 <- renderEcharts4r({
     pie2()[[3]]
   })
+  
   # table
   table1<-reactive({
     sig_table<-sig_table()
@@ -606,13 +618,13 @@ server <- function(input, output, session) {
         enriched1<-f_e1(sig_table(),input$selected_tissue,input$selected_q)
       plots_en1<- enriched1 %>%
         purrr::map(~plotEnrich(.x, showTerms = 10, numChar = 30, y = "Count", orderBy = "P.value") 
-                   + ggtitle(paste0('Positive gene correlations with ', input$origin_gene, ' ', input$origin_tissue, ' ', names(.x))))
+                   + ggtitle(paste0('Positive gene correlations with ', input$origin_gene, ' ',input$origin_tissue, ' ', names(.x))))
       progress$set(value = 2)
       
       enriched2<-f_e2(sig_table(),input$selected_tissue,input$selected_q)
       plots_en2<- enriched2 %>%
         purrr::map(~plotEnrich(.x, showTerms = 10, numChar = 30, y = "Count", orderBy = "P.value")
-                   + ggtitle(paste0('Negative gene correlations with ', input$origin_gene, ' ', input$origin_tissue, ' ', names(.x))))
+                   + ggtitle(paste0('Negative gene correlations with ', input$origin_gene, ' ', input$origin_tissue, ' ',names(.x))))
       progress$set(value = 3)
       
       plots_all<-c(plots_en1,plots_en2)
