@@ -599,8 +599,9 @@ server <- function(input, output, session) {
       progress$set(message = 'Gnerating the enrichement',
                    detail = 'Just wait a second')
       progress$set(value = 1)
-      
-      enriched1<-f_e1(sig_table(),input$selected_tissue,input$selected_q)
+      tryCatch({
+        # Your plot code here
+        enriched1<-f_e1(sig_table(),input$selected_tissue,input$selected_q)
       plots_en1<- enriched1 %>%
         purrr::map(~plotEnrich(.x, showTerms = 10, numChar = 30, y = "Count", orderBy = "P.value") 
                    + ggtitle(paste0('Positive gene correlations with ', input$origin_gene, ' ', names(.x))))
@@ -633,6 +634,11 @@ server <- function(input, output, session) {
           })
         })
       }
+      }, error = function(e) {
+        # Display an error message if an error occurs
+        showNotification("The selceted tissue do not contain enough gene to generate the enrichment. Please select again.", type = "error")
+      })
+      
       progress$set(value = 5)
     } else {
       showNotification("Please first click the Pie chart body to selected an tissue.",duration = NULL,type="warning")
