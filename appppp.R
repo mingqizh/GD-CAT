@@ -636,12 +636,12 @@ server <- function(input, output, session) {
       }
       }, error = function(e) {
         # Display an error message if an error occurs
-        showNotification("The selceted tissue do not contain enough gene to generate the enrichment. Please select again.", type = "error")
-      })
+        shinyalert("Oops","The selceted tissue do not contain enough gene to generate the enrichment. Please select again.", type = "error")
+       })
       
       progress$set(value = 5)
     } else {
-      showNotification("Please first click the Pie chart body to selected an tissue.",duration = NULL,type="warning")
+      shinyalert("Warning!", "Please first click the Pie chart body to selected an tissue.", type = "warning")
     }
   })
   output$download <- downloadHandler(
