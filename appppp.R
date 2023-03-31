@@ -83,7 +83,7 @@ t2<-function(){
               width = 12,
               tabPanel('All genes q<0.1', echarts4rOutput('plot.p1'),downloadButton("p1", "Download PDF"),),
               tabPanel('All genes q<0.01', echarts4rOutput('plot.p2')),
-              tabPanel('All genes q<0.0001', echarts4rOutput('plot.p3')),
+              tabPanel('All genes q<0.001', echarts4rOutput('plot.p3')),
               tabPanel('Origin-removed q<0.01', echarts4rOutput('plot.p4')),
               tabPanel('Origin-removed q<0.001', echarts4rOutput('plot.p5')),
               tabPanel('Origin-removed q<0.0001', echarts4rOutput('plot.p6')),
@@ -351,6 +351,7 @@ server <- function(input, output, session) {
     
     cor_table$pvalue = signif(new_p$value, 3)
     cor_table$bicor = round(cor_table$bicor, 3)
+    cor_table = cor_table[!cor_table$gene_tissue_1==cor_table$gene_tissue_2,]
     cor_table$qvalue = signif(p.adjust(cor_table$pvalue, "BH"), 3)
     cor_table = cor_table[order(cor_table$qvalue, decreasing=F),]
     cor_table = na.omit(cor_table)
@@ -365,7 +366,7 @@ server <- function(input, output, session) {
     #sig_table åé¢éè¦ç¨å°
     sig_table = cor_table[cor_table$qvalue<0.1,]
     sig_table$qcat =ifelse(sig_table$qvalue<0.01, 'q<0.01', 'q<0.1')
-    sig_table$qcat =ifelse(sig_table$qvalue<0.0001, 'q<0.0001', paste0(sig_table$qcat))
+    sig_table$qcat =ifelse(sig_table$qvalue<0.001, 'q<0.001', paste0(sig_table$qcat))
     
     sig_table
     
@@ -481,6 +482,7 @@ server <- function(input, output, session) {
     full_cors=NULL
     cor_table$pvalue = signif(new_p$value, 3)
     cor_table$bicor = round(cor_table$bicor, 3)
+    cor_table = cor_table[!cor_table$gene_tissue_1==cor_table$gene_tissue_2,]
     cor_table$qvalue = signif(p.adjust(cor_table$pvalue, "BH"), 3)
     cor_table = cor_table[order(cor_table$qvalue, decreasing=F),]
     cor_table = na.omit(cor_table)
@@ -604,13 +606,13 @@ server <- function(input, output, session) {
         enriched1<-f_e1(sig_table(),input$selected_tissue,input$selected_q)
       plots_en1<- enriched1 %>%
         purrr::map(~plotEnrich(.x, showTerms = 10, numChar = 30, y = "Count", orderBy = "P.value") 
-                   + ggtitle(paste0('Positive gene correlations with ', input$origin_gene, ' ', names(.x))))
+                   + ggtitle(paste0('Positive gene correlations with ', input$origin_gene, ' ', input$origin_tissue, ' ', names(.x))))
       progress$set(value = 2)
       
       enriched2<-f_e2(sig_table(),input$selected_tissue,input$selected_q)
       plots_en2<- enriched2 %>%
         purrr::map(~plotEnrich(.x, showTerms = 10, numChar = 30, y = "Count", orderBy = "P.value")
-                   + ggtitle(paste0('Negative gene correlations with ', input$origin_gene, ' ', names(.x))))
+                   + ggtitle(paste0('Negative gene correlations with ', input$origin_gene, ' ', input$origin_tissue, ' ', names(.x))))
       progress$set(value = 3)
       
       plots_all<-c(plots_en1,plots_en2)
