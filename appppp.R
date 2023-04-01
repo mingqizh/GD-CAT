@@ -64,7 +64,6 @@ sidebar <- function(){
         Heart_Left_Ventricle = "Heart - Left Ventricle", 
         Kidney_Cortex = "Kidney - Cortex", 
         Liver = "Liver", 
-        Lung = "Lung", 
         Muscle_Skeletal = "Muscle - Skeletal", 
         Spleen = "Spleen", 
         Small_Intestine_Terminal_Ileum = "Small Intestine - Terminal Ileum", 
@@ -464,7 +463,7 @@ server <- function(input, output, session) {
   net<-eventReactive(input$btn1,{
     progress <- Progress$new(session, min=0, max=5)
     on.exit(progress$close())
-    progress$set(message = 'Gnerating the enrichement',
+    progress$set(message = 'Generating the enrichement',
                  detail = 'Just wait a second')
     progress$set(value = 1)
     isolate({
