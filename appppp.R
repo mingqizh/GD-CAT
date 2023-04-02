@@ -46,7 +46,7 @@ sidebar <- function(){
       menuItem("Instruction",  tabName = "t2",icon = icon("dashboard")),
       menuItem("Settings",  tabName = "t2",icon = icon("dashboard"))
     ),
-    radioButtons(inputId = "specie",label = "Chose a species",choices = c("Human","Mouse")),
+    radioButtons(inputId = "specie",label = "Chose a species",choices = c("Human","Mouse - coming soon")),
     radioButtons("Gender", "Chose Sex",c("Both"="both","Male"="male", "Female"="female")),
     textInput("origin_gene","origin_gene, Official NBCI gene symbol",value = "ADIPOQ"),
     selectInput(
@@ -85,9 +85,9 @@ t2<-function(){
               tabPanel('All genes q<0.1', echarts4rOutput('plot.p1')),
               tabPanel('All genes q<0.01', echarts4rOutput('plot.p2')),
               tabPanel('All genes q<0.001', echarts4rOutput('plot.p3')),
-              tabPanel('Origin-removed q<0.01', echarts4rOutput('plot.p4')),
-              tabPanel('Origin-removed q<0.001', echarts4rOutput('plot.p5')),
-              tabPanel('Origin-removed q<0.0001', echarts4rOutput('plot.p6')),
+              tabPanel('Origin-removed q<0.1', echarts4rOutput('plot.p4')),
+              tabPanel('Origin-removed q<0.01', echarts4rOutput('plot.p5')),
+              tabPanel('Origin-removed q<0.001', echarts4rOutput('plot.p6')),
               tabPanel('Table-1',DTOutput('table.t1'))
             ),
             shinydashboard::box(
@@ -100,7 +100,7 @@ t2<-function(){
             tabBox(title="Cell type",width=12,height="500px",
                    tabPanel('Cell type',echarts4rOutput('cell'))
             ),
-            sliderInput(inputId = "topn",label = "How many top ranked co-correlated genes do you want to see?",value = 30, min = 1, max = 50),
+            sliderInput(inputId = "topn",label = "How many top-ranked correlated genes do you want to see?",value = 30, min = 1, max = 50),
             tabBox(title="Top-N",width=12,height="500px",
                    tabPanel('Top-ranked genes',echarts4rOutput('plot.top1')),
                    tabPanel('Top-ranked genes without origin tissue',echarts4rOutput('plot.top2'))
@@ -290,7 +290,7 @@ get_cell<-function(working_dataset, sig_table, origin_gene, origin_tissue,col_sc
   cor_table_sc$tissue = gsub('...', ' - ', cor_table_sc$tissue, fixed=T)
   cor_table_sc$tissue = gsub('..Omentum.', ' (Omentum)', cor_table_sc$tissue, fixed=T)
   cor_table_sc$tissue = gsub('Left.Ventricle', 'Left Ventricle', cor_table_sc$tissue, fixed=T)
-  top_genes2 = cor_table_sc[cor_table_sc$pvalue<0.001,]
+  top_genes2 = cor_table_sc
   top_genes2$color = col_scheme[match(top_genes2$tissue, names(col_scheme))]
   top_genes2 = top_genes2[order(abs(top_genes2$bicor), decreasing = T),]
 }
@@ -328,7 +328,7 @@ server <- function(input, output, session) {
     progress <- Progress$new(session, min=0, max=5)
     on.exit(progress$close())
     progress$set(message = 'Pre-processing raw data',
-                 detail = 'It will take around 2 mins, please be patient')
+                 detail = 'It will take around 2-5 minutes depending on usage')
     progress$set(value = 1)
     isolate({
       origin_gene = input$origin_gene
@@ -463,7 +463,7 @@ server <- function(input, output, session) {
   net<-eventReactive(input$btn1,{
     progress <- Progress$new(session, min=0, max=5)
     on.exit(progress$close())
-    progress$set(message = 'Generating the enrichement',
+    progress$set(message = 'Generating the enrichements',
                  detail = 'Just wait a second')
     progress$set(value = 1)
     isolate({
@@ -522,7 +522,7 @@ server <- function(input, output, session) {
     cols_set$cols = map1$cols[match(row.names(cols_set), map1$gene_tissue_1)]
     cols_set$cols = ifelse(row.names(cols_set) %in% origin_gene_tissue, 'gray5', paste0(cols_set$cols))
     
-    qgraph(map2, minimum = 0.3, cut = 0.8, vsize = 3, color=cols_set$cols, legend = F, borders = TRUE, layout='spring', posCol = "dodgerblue3", negCol = "firebrick3", label.cex=4, directed=F, labels = colnames(map2)) 
+    qgraph(map2, minimum = 0.5, cut = 0.85, vsize = 3, color=cols_set$cols, legend = F, borders = TRUE, layout='spring', posCol = "dodgerblue3", negCol = "firebrick3", label.cex=4, directed=F, labels = colnames(map2)) 
   })
   output$net<-renderPlot({
     net()
@@ -674,7 +674,7 @@ server <- function(input, output, session) {
   # tips
   observeEvent(input$tabs, {
     if(input$tabs=='t2'){
-      showNotification("Click the legend (on the right of the chart body) of the Pie chart to toggle the display of the series.",duration = NULL,type="message")
+      showNotification("Click the tissue on the Pie chart to toggle the display of the series.",duration = NULL,type="message")
     }
   })
 }
