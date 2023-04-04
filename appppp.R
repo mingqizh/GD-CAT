@@ -310,10 +310,10 @@ get_top_genes2<-function(sig_table,max_gene_length,origin_tissue, col_scheme){
   
   top_genes
 }
-
+load("C:/Users/mingqiz7/Desktop/GTEx app/data/working_dataset.RData")
 server <- function(input, output, session) {
   working_dataset<-eventReactive(input$import,{
-    load("C:/Users/mingqiz7/Desktop/GTEx app/data/working_dataset.RData")
+    
     isolate({
       if(input$Gender == "both"){
         working_dataset<-both
