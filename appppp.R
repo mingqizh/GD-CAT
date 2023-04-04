@@ -97,6 +97,9 @@ t2<-function(){
               actionButton('btn', class = "btn-primary", 'Start Analysis'),
               uiOutput('plots.en')
             ),
+            tabBox(title="Age and sex of the cohort",width=12,height="500px",
+                   tabPanel('Age and sex of the cohort',plotOutput('AS'))
+            ),
             tabBox(title="Cell type",width=12,height="500px",
                    tabPanel('Cell type',echarts4rOutput('cell'))
             ),
@@ -388,6 +391,44 @@ server <- function(input, output, session) {
     shinyalert("Warning!","Message to explain this", type = "warning")
   })
   
+  #
+  output$AS<-renderPlot({
+    working_dataset<-working_dataset()
+    origin_gene<-input$origin_gene
+    origin_tissue=input$origin_tissue
+    origin_gene_tissue = paste0(origin_gene, '_', origin_tissue)
+    
+    met_dat = read.delim('GTEx_Analysis_v8_Annotations_SubjectPhenotypesDS.txt')
+    
+    sex_table = read.delim('GTEx_Analysis_v8_Annotations_SubjectPhenotypesDS.txt')
+    sex_table$GTEx_ID = gsub('GTEX-', '', sex_table$SUBJID)
+    sex_table$sexMF = ifelse(sex_table$SEX==1, 'M', 'F')
+    new_trts = sex_table[sex_table$GTEx_ID %in% row.names(working_dataset),]
+    table(new_trts$sexMF)
+    #  F   M
+    
+    table(new_trts$AGE)
+    age_factors = as.data.frame(table(new_trts$AGE))
+    age_factors$seq_num = seq(length(row.names(age_factors)))
+    new_trts$age_num = age_factors$seq_num[match(new_trts$AGE, age_factors$Var1)]
+    
+    trait_df = as.data.frame(working_dataset[,colnames(working_dataset) %in% origin_gene_tissue])
+    
+    colnames(trait_df) = 'gene_tissue'
+    row.names(trait_df) = row.names(working_dataset)
+    trait_df$age = new_trts$AGE[match(row.names(trait_df), new_trts$GTEx_ID)]
+    trait_df$age_n = new_trts$age_num[match(row.names(trait_df), new_trts$GTEx_ID)]
+    
+    trait_df$sex = new_trts$sexMF[match(row.names(trait_df), new_trts$GTEx_ID)]
+    new_cors1 = bicorAndPvalue(trait_df$gene_tissue, trait_df$age_n, use = 'p')
+    age_plot1 = ggplot(trait_df, aes(x=factor(age_n), y=gene_tissue)) + geom_point() + theme_classic() + geom_smooth(aes(x=age_n, y=gene_tissue),method = 'lm')+ xlab('Age group (years)') + ylab(paste0('Normalized ', origin_gene_tissue, ' expression')) + theme(axis.text.x = element_text(angle = 45, vjust = 0.5)) +
+      scale_x_discrete(labels = c('20-29', '30-39', '40-49', '50-59', '60-69', '70-79'))  +  ggtitle(paste0(origin_gene_tissue, ' ~ Age, bicor = ', round(new_cors1$bicor, 3), 'p = ', signif(new_cors1$p, 3)))
+    sex_plot1 = ggplot(trait_df, aes(x=sex, y=gene_tissue, fill=sex)) +
+      geom_violin(trim=FALSE )+
+      geom_boxplot(width=0.1) + theme_minimal() + ylab(paste0('Normalized ', origin_gene_tissue, ' expression')) + xlab('Reported sex') + theme(legend.position = "none")+ scale_fill_manual(values=c('darkslategray1',"gold")) + stat_compare_means()
+    final_plot_metadata = grid.arrange(age_plot1, sex_plot1, ncol=2)
+    
+  })
   #cell type
   output$cell<- renderEcharts4r({
     top_genes1<-get_cell(working_dataset(),sig_table(), input$origin_gene, input$origin_tissue, col_scheme())
