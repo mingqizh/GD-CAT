@@ -263,38 +263,6 @@ f_e2 <- function(annot,select_tissue,q){
   
 }
 
-f_e3 <- function(annot,select_tissue,q){
-  pp1 = annot[annot$qvalue<as.numeric(q),]
-  pp1 = pp1[pp1$bicor>0,]
-  pp1 = pp1[pp1$tissue_2 %in% select_tissue,]
-  pp1_length = ifelse(length(row.names(pp1)) > 500, as.numeric(500), as.numeric(length(row.names(pp1))))
-  pp2 = pp1[1:pp1_length,]
-  gg1 = pp2$gene_symbol_2
-  
-  setEnrichrSite("Enrichr")
-  dbs <- listEnrichrDbs()
-  dbs1 <- c("GO_Biological_Process_2021", "Reactome_2022")
-  
-  enriched <- enrichr(gg1, dbs1)
-  
-}
-
-f_e4 <- function(annot,select_tissue,q){
-  pp1 = annot[annot$qvalue<as.numeric(q),]
-  pp1 = pp1[pp1$bicor<0,]
-  pp1 = pp1[pp1$tissue_2 %in% select_tissue,]
-  pp1_length = ifelse(length(row.names(pp1)) > 500, as.numeric(500), as.numeric(length(row.names(pp1))))
-  pp2 = pp1[1:pp1_length,]
-  gg1 = pp2$gene_symbol_2
-  
-  setEnrichrSite("Enrichr")
-  dbs <- listEnrichrDbs()
-  dbs1 <- c("GO_Biological_Process_2021", "Reactome_2022")
-  
-  enriched <- enrichr(gg1, dbs1)
-  
-  
-}
 
 get_cell<-function(working_dataset, sig_table, origin_gene, origin_tissue,col_scheme){
   #read in sc-seq matrix 
