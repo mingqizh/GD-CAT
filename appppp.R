@@ -157,7 +157,7 @@ f1<-function(annot, col_scheme){
       qcat1<-unique(.x$qcat1)
       qcat<-sub('q<','',unique(.x$qcat))
       .x %>%
-        e_chart(tissue_2) %>%
+        e_chart(tissue_2, width='500px', height = NULL) %>%
         e_pie(freq,name = qcat,right='20%') %>%
         e_add_nested("itemStyle", color) %>%
         e_title(qcat1,left="center",textStyle=list(fontSize=12)) %>%
@@ -210,7 +210,7 @@ f2<-function(annot,origin_tissue, col_scheme){
       qcat1<-unique(.x$qcat1)
       qcat<-sub('q<','',unique(.x$qcat))
       .x %>%
-        e_chart(tissue_2) %>%
+        e_chart(tissue_2, width='500px', height = NULL) %>%
         e_pie(freq,name = qcat,right='20%') %>%
         e_add_nested("itemStyle", color) %>%
         e_title(qcat1,left="center",textStyle=list(fontSize=12)) %>%
