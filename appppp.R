@@ -240,13 +240,30 @@ f_e1 <- function(annot,select_tissue,q){
   
   setEnrichrSite("Enrichr")
   dbs <- listEnrichrDbs()
-  dbs1 <- c("GO_Biological_Process_2021", "Reactome_2022")
+  dbs1 <- "GO_Biological_Process_2021"
   
   enriched <- enrichr(gg1, dbs1)
   
 }
 
 f_e2 <- function(annot,select_tissue,q){
+  pp1 = annot[annot$qvalue<as.numeric(q),]
+  pp1 = pp1[pp1$bicor>0,]
+  pp1 = pp1[pp1$tissue_2 %in% select_tissue,]
+  pp1_length = ifelse(length(row.names(pp1)) > 500, as.numeric(500), as.numeric(length(row.names(pp1))))
+  pp2 = pp1[1:pp1_length,]
+  gg1 = pp2$gene_symbol_2
+  
+  setEnrichrSite("Enrichr")
+  dbs <- listEnrichrDbs()
+  dbs1 <- "Reactome_2022"
+  
+  enriched <- enrichr(gg1, dbs1)
+  
+  
+}
+
+f_e3 <- function(annot,select_tissue,q){
   pp1 = annot[annot$qvalue<as.numeric(q),]
   pp1 = pp1[pp1$bicor<0,]
   pp1 = pp1[pp1$tissue_2 %in% select_tissue,]
@@ -256,13 +273,28 @@ f_e2 <- function(annot,select_tissue,q){
   
   setEnrichrSite("Enrichr")
   dbs <- listEnrichrDbs()
-  dbs1 <- c("GO_Biological_Process_2021", "Reactome_2022")
+  dbs1 <- "GO_Biological_Process_2021"
+  
+  enriched <- enrichr(gg1, dbs1)
+  
+}
+
+f_e4 <- function(annot,select_tissue,q){
+  pp1 = annot[annot$qvalue<as.numeric(q),]
+  pp1 = pp1[pp1$bicor<0,]
+  pp1 = pp1[pp1$tissue_2 %in% select_tissue,]
+  pp1_length = ifelse(length(row.names(pp1)) > 500, as.numeric(500), as.numeric(length(row.names(pp1))))
+  pp2 = pp1[1:pp1_length,]
+  gg1 = pp2$gene_symbol_2
+  
+  setEnrichrSite("Enrichr")
+  dbs <- listEnrichrDbs()
+  dbs1 <- "Reactome_2022"
   
   enriched <- enrichr(gg1, dbs1)
   
   
 }
-
 
 get_cell<-function(working_dataset, sig_table, origin_gene, origin_tissue,col_scheme){
   #read in sc-seq matrix 
@@ -666,16 +698,28 @@ server <- function(input, output, session) {
         enriched1<-f_e1(sig_table(),input$selected_tissue,input$selected_q)
         plots_en1<- enriched1 %>%
           purrr::map(~plotEnrich(.x, showTerms = 10, numChar = 30, y = "Count", orderBy = "P.value") 
-                     + ggtitle(paste0('Positive gene correlations with ', input$origin_gene, ' ',input$origin_tissue, ' ', names(.x))))
+                     + ggtitle(paste0('Positive gene correlations with ', input$origin_gene, ' ',input$origin_tissue, ' ', 'GO_Biological_Process_2021')))
         progress$set(value = 2)
         
         enriched2<-f_e2(sig_table(),input$selected_tissue,input$selected_q)
         plots_en2<- enriched2 %>%
           purrr::map(~plotEnrich(.x, showTerms = 10, numChar = 30, y = "Count", orderBy = "P.value")
-                     + ggtitle(paste0('Negative gene correlations with ', input$origin_gene, ' ', input$origin_tissue, ' ',names(.x))))
+                     + ggtitle(paste0('Positive gene correlations with ', input$origin_gene, ' ', input$origin_tissue, ' ','Reactome_2022')))
+ 
+        
+        enriched3<-f_e3(sig_table(),input$selected_tissue,input$selected_q)
+        plots_en3<- enriched3 %>%
+          purrr::map(~plotEnrich(.x, showTerms = 10, numChar = 30, y = "Count", orderBy = "P.value") 
+                     + ggtitle(paste0('Negative gene correlations with ', input$origin_gene, ' ',input$origin_tissue, ' ', 'GO_Biological_Process_2021')))
+
+        
+        enriched4<-f_e4(sig_table(),input$selected_tissue,input$selected_q)
+        plots_en4<- enriched4 %>%
+          purrr::map(~plotEnrich(.x, showTerms = 10, numChar = 30, y = "Count", orderBy = "P.value")
+                     + ggtitle(paste0('Negative gene correlations with ', input$origin_gene, ' ', input$origin_tissue, ' ','Reactome_2022')))
         progress$set(value = 3)
         
-        plots_all<-c(plots_en1,plots_en2)
+        plots_all<-c(plots_en1,plots_en2, plots_en3,plots_en4)
         plots(plots_all)
         output[['plots.en']]<-renderUI({
           plot_output_list <- lapply(1:length(plots_all), function(i) {
@@ -715,7 +759,7 @@ server <- function(input, output, session) {
       on.exit(setwd(owd))
       plots<-plots()
       for(i in 1:length(plots)){
-        ggsave( paste0('plot',i,'.png'), plot = plots[[i]], device = "png", width = 6, height = 9)
+        ggsave( paste0('plot',i,'.png'), plot = plots[[i]], device = "png", width = 12, height = 9)
       }
       zip::zip(file,paste0('plot',1:length(plots),'.png'))
     }
