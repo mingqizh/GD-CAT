@@ -31,7 +31,8 @@ library(MetBrewer)
 library(feather)
 library(tidyr)
 library(tibble)
-library(webshot)
+library(gridExtra)
+library(ggpubr)
 allowWGCNAThreads()
 
 header <- function(){
@@ -46,7 +47,7 @@ sidebar <- function(){
       menuItem("Instruction",  tabName = "t2",icon = icon("dashboard")),
       menuItem("Settings",  tabName = "t2",icon = icon("dashboard"))
     ),
-    radioButtons(inputId = "specie",label = "Chose a species",choices = c("Human","Mouse - coming soon")),
+    radioButtons(inputId = "specie",label = "Chose a species",choices = c("Human","Mouse")),
     radioButtons("Gender", "Chose Sex",c("Both"="both","Male"="male", "Female"="female")),
     textInput("origin_gene","origin_gene, Official NBCI gene symbol",value = "ADIPOQ"),
     selectInput(
@@ -64,6 +65,7 @@ sidebar <- function(){
         Heart_Left_Ventricle = "Heart - Left Ventricle", 
         Kidney_Cortex = "Kidney - Cortex", 
         Liver = "Liver", 
+        Lung = "Lung", 
         Muscle_Skeletal = "Muscle - Skeletal", 
         Spleen = "Spleen", 
         Small_Intestine_Terminal_Ileum = "Small Intestine - Terminal Ileum", 
@@ -98,7 +100,8 @@ t2<-function(){
               uiOutput('plots.en')
             ),
             tabBox(title="Age and sex of the cohort",width=12,height="500px",
-                   tabPanel('Age and sex of the cohort',plotOutput('AS'))
+                   tabPanel('Age and sex of the cohort',plotOutput('AS'),
+                            downloadButton("ASP", "Download Image"))
             ),
             tabBox(title="Cell type",width=12,height="500px",
                    tabPanel('Cell type',echarts4rOutput('cell'))
@@ -157,7 +160,7 @@ f1<-function(annot, col_scheme){
       qcat1<-unique(.x$qcat1)
       qcat<-sub('q<','',unique(.x$qcat))
       .x %>%
-        e_chart(tissue_2, width='500px', height = NULL) %>%
+        e_chart(tissue_2, width='400px', height = NULL) %>%
         e_pie(freq,name = qcat,right='20%') %>%
         e_add_nested("itemStyle", color) %>%
         e_title(qcat1,left="center",textStyle=list(fontSize=12)) %>%
@@ -204,7 +207,7 @@ f2<-function(annot,origin_tissue, col_scheme){
       qcat1<-unique(.x$qcat1)
       qcat<-sub('q<','',unique(.x$qcat))
       .x %>%
-        e_chart(tissue_2, width='500px', height = NULL) %>%
+        e_chart(tissue_2, width='400px', height = NULL) %>%
         e_pie(freq,name = qcat,right='20%') %>%
         e_add_nested("itemStyle", color) %>%
         e_title(qcat1,left="center",textStyle=list(fontSize=12)) %>%
@@ -260,6 +263,38 @@ f_e2 <- function(annot,select_tissue,q){
   
 }
 
+f_e3 <- function(annot,select_tissue,q){
+  pp1 = annot[annot$qvalue<as.numeric(q),]
+  pp1 = pp1[pp1$bicor>0,]
+  pp1 = pp1[pp1$tissue_2 %in% select_tissue,]
+  pp1_length = ifelse(length(row.names(pp1)) > 500, as.numeric(500), as.numeric(length(row.names(pp1))))
+  pp2 = pp1[1:pp1_length,]
+  gg1 = pp2$gene_symbol_2
+  
+  setEnrichrSite("Enrichr")
+  dbs <- listEnrichrDbs()
+  dbs1 <- c("GO_Biological_Process_2021", "Reactome_2022")
+  
+  enriched <- enrichr(gg1, dbs1)
+  
+}
+
+f_e4 <- function(annot,select_tissue,q){
+  pp1 = annot[annot$qvalue<as.numeric(q),]
+  pp1 = pp1[pp1$bicor<0,]
+  pp1 = pp1[pp1$tissue_2 %in% select_tissue,]
+  pp1_length = ifelse(length(row.names(pp1)) > 500, as.numeric(500), as.numeric(length(row.names(pp1))))
+  pp2 = pp1[1:pp1_length,]
+  gg1 = pp2$gene_symbol_2
+  
+  setEnrichrSite("Enrichr")
+  dbs <- listEnrichrDbs()
+  dbs1 <- c("GO_Biological_Process_2021", "Reactome_2022")
+  
+  enriched <- enrichr(gg1, dbs1)
+  
+  
+}
 
 get_cell<-function(working_dataset, sig_table, origin_gene, origin_tissue,col_scheme){
   #read in sc-seq matrix 
@@ -287,7 +322,7 @@ get_cell<-function(working_dataset, sig_table, origin_gene, origin_tissue,col_sc
   cor_table_sc$tissue = gsub('...', ' - ', cor_table_sc$tissue, fixed=T)
   cor_table_sc$tissue = gsub('..Omentum.', ' (Omentum)', cor_table_sc$tissue, fixed=T)
   cor_table_sc$tissue = gsub('Left.Ventricle', 'Left Ventricle', cor_table_sc$tissue, fixed=T)
-  top_genes2 = cor_table_sc
+  top_genes2 = cor_table_sc[cor_table_sc$pvalue<0.01,]
   top_genes2$color = col_scheme[match(top_genes2$tissue, names(col_scheme))]
   top_genes2 = top_genes2[order(abs(top_genes2$bicor), decreasing = T),]
 }
@@ -319,7 +354,7 @@ server <- function(input, output, session) {
       working_dataset
     })
   })
-
+  
   
   sig_table<-eventReactive(input$import,{
     progress <- Progress$new(session, min=0, max=5)
@@ -376,17 +411,16 @@ server <- function(input, output, session) {
   })
   tryCatch({
     col_scheme<-reactive({
-    sig_table<-sig_table()
-    col_scheme = rev(met.brewer('Signac', length(unique(sig_table$tissue_2))))
-    names(col_scheme) = unique(sig_table$tissue_2)
-    col_scheme
-  }) 
+      sig_table<-sig_table()
+      col_scheme = rev(met.brewer('Signac', length(unique(sig_table$tissue_2))))
+      names(col_scheme) = unique(sig_table$tissue_2)
+      col_scheme
+    }) 
   }, warning = function(w) {
     shinyalert("Warning!","Message to explain this", type = "warning")
   })
   
-  #
-  output$AS<-renderPlot({
+  AS<-reactive({
     working_dataset<-working_dataset()
     origin_gene<-input$origin_gene
     origin_tissue=input$origin_tissue
@@ -423,6 +457,20 @@ server <- function(input, output, session) {
     final_plot_metadata = grid.arrange(age_plot1, sex_plot1, ncol=2)
     
   })
+  output$AS<-renderPlot({
+    AS()
+  })
+  
+  output$ASP <- downloadHandler(
+    filename = function() {
+      "plot.png"
+    },
+    content = function(file) {
+      ggsave(file, plot = AS(), device = "png", width = 9, height = 6)
+    }
+  )
+  
+  
   #cell type
   output$cell<- renderEcharts4r({
     top_genes1<-get_cell(working_dataset(),sig_table(), input$origin_gene, input$origin_tissue, col_scheme())
@@ -437,16 +485,18 @@ server <- function(input, output, session) {
       e_x_axis(axisLabel = list(interval = 0, rotate = 45)) %>%
       e_y_axis(name = "Bicor Values")%>%
       e_datazoom(type='inside') %>%
-      e_toolbox(show=F) %>%
       e_tooltip(
         trigger = 'item',
         axisPointer = list(
           type = "shadow",
           axis='x'
         )
-      )
+      )%>%
+      e_toolbox()%>%
+      e_toolbox_feature(feature = "saveAsImage",title='Save')
   }
   )
+  
   # top n
   output$plot.top1<- renderEcharts4r({
     top_genes1<-get_top_genes1(sig_table(),input$topn, col_scheme())
@@ -461,16 +511,18 @@ server <- function(input, output, session) {
       e_x_axis(axisLabel = list(interval = 0, rotate = 45)) %>%
       e_y_axis(name = "Bicor Values")%>%
       e_datazoom(type='inside') %>%
-      e_toolbox(show=F) %>%
       e_tooltip(
         trigger = 'item',
         axisPointer = list(
           type = "shadow",
           axis='x'
         )
-      )
+      )%>%
+      e_toolbox()%>%
+      e_toolbox_feature(feature = "saveAsImage",title='Save')
   }
   )
+  
   output$plot.top2<- renderEcharts4r({
     top_genes2<-get_top_genes2(sig_table(),input$topn,input$origin_tissue, col_scheme())
     
@@ -484,30 +536,31 @@ server <- function(input, output, session) {
       e_x_axis(axisLabel = list(interval = 0, rotate = 45)) %>%
       e_y_axis(name = "Bicor Values")%>%
       e_datazoom(type='inside') %>%
-      e_toolbox(show=F) %>%
       e_tooltip(
         trigger = 'item',
         axisPointer = list(
           type = "shadow",
           axis='x'
         )
-      )
+      )%>%
+      e_toolbox()%>%
+      e_toolbox_feature(feature = "saveAsImage",title='Save')
   }
   )
- 
+  
   net<-eventReactive(input$btn1,{
     progress <- Progress$new(session, min=0, max=5)
     on.exit(progress$close())
-    progress$set(message = 'Generating the enrichements',
+    progress$set(message = 'Gnerating the enrichement',
                  detail = 'Just wait a second')
     progress$set(value = 1)
     isolate({
       number_orig_gene =as.numeric(input$within) 
-    number_peripheral_genes =as.numeric(input$external) 
-    sig_table<-sig_table()
-    working_dataset<-working_dataset()
-    origin_gene<-input$origin_gene
-    origin_tissue=input$origin_tissue
+      number_peripheral_genes =as.numeric(input$external) 
+      sig_table<-sig_table()
+      working_dataset<-working_dataset()
+      origin_gene<-input$origin_gene
+      origin_tissue=input$origin_tissue
     })
     
     origin_gene_tissue = paste0(origin_gene, '_', origin_tissue)
@@ -567,9 +620,9 @@ server <- function(input, output, session) {
       paste("Net-", Sys.Date(), ".pdf", sep="")
     },
     content = function(file) {
-        pdf(file)
-        plot(net())
-        dev.off()
+      pdf(file)
+      plot(net())
+      dev.off()
     }
   )
   #output$table.map2<-renderDT(
@@ -631,53 +684,54 @@ server <- function(input, output, session) {
     print(c('You selected tissue:',input$selected_tissue,', and q<',input$selected_q))
   })
   # enrichment
+  # enrichment
   plots<-reactiveVal()
   observeEvent( input$btn, {
     if(!is.null(input$selected_tissue)){
       progress <- Progress$new(session, min=0, max=5)
       on.exit(progress$close())
-      progress$set(message = 'Gnerating the enrichement',
+      progress$set(message = 'Gnerating the enrichements',
                    detail = 'Just wait a second')
       progress$set(value = 1)
       tryCatch({
         # Your plot code here
         enriched1<-f_e1(sig_table(),input$selected_tissue,input$selected_q)
-      plots_en1<- enriched1 %>%
-        purrr::map(~plotEnrich(.x, showTerms = 10, numChar = 30, y = "Count", orderBy = "P.value") 
-                   + ggtitle(paste0('Positive gene correlations with ', input$origin_gene, ' ',input$origin_tissue, ' ', names(.x))))
-      progress$set(value = 2)
-      
-      enriched2<-f_e2(sig_table(),input$selected_tissue,input$selected_q)
-      plots_en2<- enriched2 %>%
-        purrr::map(~plotEnrich(.x, showTerms = 10, numChar = 30, y = "Count", orderBy = "P.value")
-                   + ggtitle(paste0('Negative gene correlations with ', input$origin_gene, ' ', input$origin_tissue, ' ',names(.x))))
-      progress$set(value = 3)
-      
-      plots_all<-c(plots_en1,plots_en2)
-      plots(plots_all)
-      output[['plots.en']]<-renderUI({
-        plot_output_list <- lapply(1:length(plots_all), function(i) {
-          plotname <- paste("en", i, sep="")
-          plotOutput(plotname)
-        })
-        plot_output_list$btn_down<- downloadButton("download", "Download Image")
-        do.call(tagList, plot_output_list)
-      }
-      )
-      progress$set(value = 4)
-      for (i in 1:length(plots_all)) {
-        local({
-          my_i <- i
-          plotname <- paste("en", my_i, sep="")
-          output[[plotname]] <- renderPlot({
-            plots_all[[my_i]]
+        plots_en1<- enriched1 %>%
+          purrr::map(~plotEnrich(.x, showTerms = 10, numChar = 30, y = "Count", orderBy = "P.value") 
+                     + ggtitle(paste0('Positive gene correlations with ', input$origin_gene, ' ',input$origin_tissue, ' ', names(.x))))
+        progress$set(value = 2)
+        
+        enriched2<-f_e2(sig_table(),input$selected_tissue,input$selected_q)
+        plots_en2<- enriched2 %>%
+          purrr::map(~plotEnrich(.x, showTerms = 10, numChar = 30, y = "Count", orderBy = "P.value")
+                     + ggtitle(paste0('Negative gene correlations with ', input$origin_gene, ' ', input$origin_tissue, ' ',names(.x))))
+        progress$set(value = 3)
+        
+        plots_all<-c(plots_en1,plots_en2)
+        plots(plots_all)
+        output[['plots.en']]<-renderUI({
+          plot_output_list <- lapply(1:length(plots_all), function(i) {
+            plotname <- paste("en", i, sep="")
+            plotOutput(plotname)
           })
-        })
-      }
+          plot_output_list$btn_down<- downloadButton("download", "Download Image")
+          do.call(tagList, plot_output_list)
+        }
+        )
+        progress$set(value = 4)
+        for (i in 1:length(plots_all)) {
+          local({
+            my_i <- i
+            plotname <- paste("en", my_i, sep="")
+            output[[plotname]] <- renderPlot({
+              plots_all[[my_i]]
+            })
+          })
+        }
       }, error = function(e) {
         # Display an error message if an error occurs
-        shinyalert("Oops","The selceted tissue do not contain enough gene to generate the enrichment. Please select again.", type = "error")
-       })
+        shinyalert("Oops","The selected tissue do not contain enough genes to generate the enrichment. Please select again.", type = "error")
+      })
       
       progress$set(value = 5)
     } else {
@@ -693,15 +747,15 @@ server <- function(input, output, session) {
       on.exit(setwd(owd))
       plots<-plots()
       for(i in 1:length(plots)){
-        ggsave( paste0('plot',i,'.png'), plot = plots[[i]], device = "png")
+        ggsave( paste0('plot',i,'.png'), plot = plots[[i]], device = "png", width = 6, height = 9)
       }
       zip::zip(file,paste0('plot',1:length(plots),'.png'))
     }
   )
-  # tips
+  #tip
   observeEvent(input$tabs, {
     if(input$tabs=='t2'){
-      showNotification("Click the tissue on the Pie chart to toggle the display of the series.",duration = NULL,type="message")
+      showNotification("Click the legend (on the right of the chart body) of the Pie chart to toggle the display of the series.",duration = NULL,type="message")
     }
   })
 }
