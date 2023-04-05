@@ -182,12 +182,6 @@ f1<-function(annot, col_scheme){
 
 f2<-function(annot,origin_tissue, col_scheme){
   annot<-annot[!grepl(origin_tissue, annot$tissue_2),]
-  sig_table = annot[annot$qvalue<0.1,]
-  sig_table1 = annot[annot$qvalue<0.01,]
-  sig_table1$qcat = paste0(0.01)
-  sig_table2 = annot[annot$qvalue<0.001,]
-  sig_table2$qcat = paste0(0.001)
-  sig_table = as.data.frame(rbind(sig_table, sig_table1, sig_table2))
   
   binned_sig_prots= sig_table %>%
     dplyr::group_by(qcat, tissue_2) %>%
@@ -597,14 +591,6 @@ server <- function(input, output, session) {
   output$plot.p1 <- renderEcharts4r({
     pie1()[[3]]
   })
-  output$p1 <- downloadHandler(
-    filename = function() {
-      paste("Pie-", Sys.Date(), ".pdf", sep="")
-    },
-    content = function(file) {
-      webshot(pie1()[[3]]$html, file)
-    }
-  )
   output$plot.p2 <- renderEcharts4r({
     pie1()[[2]]
   })
@@ -615,13 +601,13 @@ server <- function(input, output, session) {
     f2(sig_table(),input$origin_tissue, col_scheme())$echart
   })
   output$plot.p4 <- renderEcharts4r({
-    pie2()[[2]]
+    pie2()[[3]]
   })
   output$plot.p5 <- renderEcharts4r({
-    pie2()[[1]]
+    pie2()[[2]]
   })
   output$plot.p6 <- renderEcharts4r({
-    pie2()[[3]]
+    pie2()[[1]]
   })
   
   # table
