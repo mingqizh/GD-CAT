@@ -33,6 +33,7 @@ library(tidyr)
 library(tibble)
 library(gridExtra)
 library(ggpubr)
+library(writexl)
 allowWGCNAThreads()
 
 header <- function(){
@@ -111,8 +112,8 @@ t2<-function(){
                    tabPanel('Top-ranked genes',echarts4rOutput('plot.top1')),
                    tabPanel('Top-ranked genes without origin tissue',echarts4rOutput('plot.top2'))
             ),
-            sliderInput(inputId = "within",label = "Within tissue gene numbers",value = 30, min = 1, max = 50),
-            sliderInput(inputId = "external",label = "Peripheral tissue gene numbers",value = 100, min = 1, max = 150),
+            sliderInput(inputId = "within",label = "How many within tissue gene numbers you want to input in the network",value = 30, min = 1, max = 50),
+            sliderInput(inputId = "external",label = "How many peripheral tissue gene numbers you want to input in the network",value = 100, min = 1, max = 150),
             shinydashboard::box(
               title = "Network Analysis",
               width = 12,
@@ -185,7 +186,7 @@ f1<-function(annot, col_scheme){
 
 f2<-function(annot,origin_tissue, col_scheme){
   annot<-annot[!grepl(origin_tissue, annot$tissue_2),]
-  
+  sig_table=annot
   binned_sig_prots= sig_table %>%
     dplyr::group_by(qcat, tissue_2) %>%
     dplyr::summarise(n = n()) %>%
@@ -477,7 +478,7 @@ server <- function(input, output, session) {
     
     top_genes1 %>%
       arrange(desc(abs(bicor))) %>%
-      e_chart(cell_tissue, width='400px', height = NULL) %>%
+      e_chart(cell_tissue, width='300px', height = NULL) %>%
       e_bar(bicor) %>%
       e_legend(show=F) %>%
       e_add_nested("itemStyle", color) %>%
@@ -503,7 +504,7 @@ server <- function(input, output, session) {
     
     top_genes1 %>%
       arrange(desc(abs(bicor))) %>%
-      e_chart(gene_tissue_2, width='400px', height = NULL) %>%
+      e_chart(gene_tissue_2, width='300px', height = NULL) %>%
       e_bar(bicor) %>%
       e_legend(show=F) %>%
       e_add_nested("itemStyle", color) %>%
@@ -528,9 +529,8 @@ server <- function(input, output, session) {
     
     top_genes2 %>%
       arrange(desc(abs(bicor))) %>%
-      e_chart(gene_tissue_2, width='500px', height = NULL) %>%
+      e_chart(gene_tissue_2, width='300px', height = NULL) %>%
       e_bar(bicor) %>%
-      e_legend(show=F) %>%
       e_add_nested("itemStyle", color) %>%
       e_grid(bottom="100px") %>%
       e_x_axis(axisLabel = list(interval = 0, rotate = 45)) %>%
@@ -675,8 +675,8 @@ server <- function(input, output, session) {
                    scrollX=TRUE,
                    autoWidth=FALSE,
                    buttons = c('copy','csv','excel'),
-                   lengthMenu = list(c(10.25,50),
-                                     c(10,25,59,"All"))))
+                   lengthMenu = list(c(10,25,50),
+                                     c(10,25,50,"All")) ))
   
   
   # click
@@ -684,8 +684,11 @@ server <- function(input, output, session) {
     print(c('You selected tissue:',input$selected_tissue,', and q<',input$selected_q))
   })
   # enrichment
-  # enrichment
   plots<-reactiveVal()
+  en1<-reactiveVal()
+  en2<-reactiveVal()
+  en3<-reactiveVal()
+  en4<-reactiveVal()
   observeEvent( input$btn, {
     if(!is.null(input$selected_tissue)){
       progress <- Progress$new(session, min=0, max=5)
@@ -700,25 +703,25 @@ server <- function(input, output, session) {
           purrr::map(~plotEnrich(.x, showTerms = 10, numChar = 30, y = "Count", orderBy = "P.value") 
                      + ggtitle(paste0('Positive gene correlations with ', input$origin_gene, ' ',input$origin_tissue, ' ', 'GO_Biological_Process_2021')))
         progress$set(value = 2)
-        
+        en1(enriched1)
         enriched2<-f_e2(sig_table(),input$selected_tissue,input$selected_q)
         plots_en2<- enriched2 %>%
           purrr::map(~plotEnrich(.x, showTerms = 10, numChar = 30, y = "Count", orderBy = "P.value")
                      + ggtitle(paste0('Positive gene correlations with ', input$origin_gene, ' ', input$origin_tissue, ' ','Reactome_2022')))
- 
+        en2(enriched2)
         
         enriched3<-f_e3(sig_table(),input$selected_tissue,input$selected_q)
         plots_en3<- enriched3 %>%
           purrr::map(~plotEnrich(.x, showTerms = 10, numChar = 30, y = "Count", orderBy = "P.value") 
                      + ggtitle(paste0('Negative gene correlations with ', input$origin_gene, ' ',input$origin_tissue, ' ', 'GO_Biological_Process_2021')))
-
         
+        en3(enriched3)
         enriched4<-f_e4(sig_table(),input$selected_tissue,input$selected_q)
         plots_en4<- enriched4 %>%
           purrr::map(~plotEnrich(.x, showTerms = 10, numChar = 30, y = "Count", orderBy = "P.value")
                      + ggtitle(paste0('Negative gene correlations with ', input$origin_gene, ' ', input$origin_tissue, ' ','Reactome_2022')))
         progress$set(value = 3)
-        
+        en4(enriched4)
         plots_all<-c(plots_en1,plots_en2, plots_en3,plots_en4)
         plots(plots_all)
         output[['plots.en']]<-renderUI({
@@ -727,6 +730,7 @@ server <- function(input, output, session) {
             plotOutput(plotname)
           })
           plot_output_list$btn_down<- downloadButton("download", "Download Image")
+          plot_output_list$table<-downloadButton("table", "Download Table")
           do.call(tagList, plot_output_list)
         }
         )
@@ -750,6 +754,7 @@ server <- function(input, output, session) {
       shinyalert("Warning!", "Please first click the Pie chart body to selected an tissue.", type = "warning")
     }
   })
+  
   output$download <- downloadHandler(
     filename = function() {
       paste("Plots-", Sys.Date(), ".zip", sep="")
@@ -764,6 +769,16 @@ server <- function(input, output, session) {
       zip::zip(file,paste0('plot',1:length(plots),'.png'))
     }
   )
+  
+  output$table<- downloadHandler(
+    filename = function() {
+      paste("Enrichments-", Sys.Date(), ".xlsx", sep="")
+    },
+    content = function(file) {
+      write_xlsx(list(positive_GO_Biological_process = en1()[[1]], Positive_Reactome = en2()[[1]], Negative_GO_Biological_process = en3()[[1]], Negative_Reactome = en4()[[1]]), path = file)
+    }
+  )
+
   #tip
   observeEvent(input$tabs, {
     if(input$tabs=='t2'){
