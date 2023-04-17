@@ -4,7 +4,6 @@ library(shinyalert)
 library(dplyr)
 library(purrr)
 library(ggplot2)
-library(enrichR)
 library(echarts4r)
 library(MetBrewer)
 library(forcats)
@@ -21,13 +20,10 @@ library(preprocessCore)
 library(pheatmap)
 library(WGCNA)
 library(mclust)
-library(pheatmap)
 library(qvalue)
 library(RPostgres)
 library(enrichR)
 library(stats)
-library(forcats)
-library(MetBrewer)
 library(feather)
 library(tidyr)
 library(tibble)
@@ -48,8 +44,8 @@ sidebar <- function(){
       menuItem("Instruction",  tabName = "t2",icon = icon("dashboard")),
       menuItem("Settings",  tabName = "t2",icon = icon("dashboard"))
     ),
-    radioButtons(inputId = "specie",label = "Chose a species",choices = c("Human","Mouse")),
-    radioButtons("Gender", "Chose Sex",c("Both"="both","Male"="male", "Female"="female")),
+    radioButtons(inputId = "specie",label = "Choose a specie",choices = c("Human","Mouse")),
+    radioButtons("Gender", "Choose Sex",c("Both"="both","Male"="male", "Female"="female")),
     textInput("origin_gene","origin_gene, Official NBCI gene symbol",value = "ADIPOQ"),
     selectInput(
       "origin_tissue",
@@ -96,7 +92,8 @@ t2<-function(){
             shinydashboard::box(
               title = "Enrichement Analysis",
               width = 12,
-              verbatimTextOutput('text'),
+              verbatimTextOutput('text'), 
+              verbatimTextOutput('gene1'),
               actionButton('btn', class = "btn-primary", 'Start Analysis'),
               uiOutput('plots.en')
             ),
@@ -119,9 +116,7 @@ t2<-function(){
               width = 12,
               actionButton('btn1', class = "btn-primary", 'Start Analysis'),
               tabPanel('Chart',plotOutput('net')),
-              downloadButton("PDFPlot", "Download PDF"),
-              tabPanel('Chart',echarts4rOutput('plot.map3')),
-              tabPanel('Table',DTOutput('table.map2'))
+              downloadButton("PDFPlot", "Download PDF")
             )
           )
   )
@@ -296,10 +291,10 @@ f_e4 <- function(annot,select_tissue,q){
   
   
 }
-
+sc_matrix = read.csv('drive-download-20230412T194119Z-001/full pan-tissue DECON abundances.csv')
 get_cell<-function(working_dataset, sig_table, origin_gene, origin_tissue,col_scheme){
   #read in sc-seq matrix 
-  sc_matrix = read.csv('C:/Users/mingqiz7/Desktop/GTEx app/data/full pan-tissue DECON abundances.csv')
+  sc_matrix = sc_matrix
   origin_gene_tissue = paste0(origin_gene, '_', origin_tissue)
   #filter sc-seq matrix based on working_dataset object 
   row.names(sc_matrix) = sc_matrix$GTExID
@@ -340,7 +335,8 @@ get_top_genes2<-function(sig_table,max_gene_length,origin_tissue, col_scheme){
   
   top_genes
 }
-load("C:/Users/mingqiz7/Desktop/GTEx app/data/working_dataset.RData")
+load("working_dataset.RData")
+met_dat = read.delim('GTEx_Analysis_v8_Annotations_SubjectPhenotypesDS.txt')
 server <- function(input, output, session) {
   working_dataset<-eventReactive(input$import,{
     
@@ -427,9 +423,9 @@ server <- function(input, output, session) {
     origin_tissue=input$origin_tissue
     origin_gene_tissue = paste0(origin_gene, '_', origin_tissue)
     
-    met_dat = read.delim('GTEx_Analysis_v8_Annotations_SubjectPhenotypesDS.txt')
+    met_dat = met_dat
     
-    sex_table = read.delim('GTEx_Analysis_v8_Annotations_SubjectPhenotypesDS.txt')
+    sex_table = met_dat
     sex_table$GTEx_ID = gsub('GTEX-', '', sex_table$SUBJID)
     sex_table$sexMF = ifelse(sex_table$SEX==1, 'M', 'F')
     new_trts = sex_table[sex_table$GTEx_ID %in% row.names(working_dataset),]
@@ -520,10 +516,18 @@ server <- function(input, output, session) {
         )
       )%>%
       e_toolbox()%>%
-      e_toolbox_feature(feature = "saveAsImage",title='Save')
+      e_toolbox_feature(feature = "saveAsImage",title='Save')%>%
+      e_on(
+        "click",
+        "function(params) {
+       Shiny.setInputValue('selected_gene', params.name, {priority: 'event'});
+     }"
+      )
   }
   )
-  
+  output$gene1 <- renderText({
+    input$selected_gene
+  })
   output$plot.top2<- renderEcharts4r({
     top_genes2<-get_top_genes2(sig_table(),input$topn,input$origin_tissue, col_scheme())
     
@@ -778,7 +782,7 @@ server <- function(input, output, session) {
       write_xlsx(list(positive_GO_Biological_process = en1()[[1]], Positive_Reactome = en2()[[1]], Negative_GO_Biological_process = en3()[[1]], Negative_Reactome = en4()[[1]]), path = file)
     }
   )
-
+  
   #tip
   observeEvent(input$tabs, {
     if(input$tabs=='t2'){
@@ -788,5 +792,3 @@ server <- function(input, output, session) {
 }
 
 shinyApp(ui, server)
-
-
