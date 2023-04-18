@@ -44,7 +44,7 @@ sidebar <- function(){
       menuItem("Instruction",  tabName = "t2",icon = icon("dashboard")),
       menuItem("Settings",  tabName = "t2",icon = icon("dashboard"))
     ),
-    radioButtons(inputId = "specie",label = "Choose a specie",choices = c("Human","Mouse(coming soon)")),
+    radioButtons(inputId = "specie",label = "Choose a species",choices = c("Human","Mouse(coming soon)")),
     radioButtons("Gender", "Choose Sex",c("Both"="both","Male"="male", "Female"="female")),
     textInput("origin_gene","origin_gene, Official NBCI gene symbol",value = "ADIPOQ"),
     selectInput(
