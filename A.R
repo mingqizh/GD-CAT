@@ -399,10 +399,10 @@ server <- function(input, output, session) {
     
     tissue2 <- working_dataset[,grepl('Adipose - Subcutaneous', colnames(working_dataset)) | grepl('Adipose - Visceral (Omentum)', colnames(working_dataset), fixed=T) | grepl('Brain - Hypothalamus', colnames(working_dataset)) | grepl('Brain - Hippocampus', colnames(working_dataset)) | grepl('Small Intestine - Terminal Ileum', colnames(working_dataset), fixed=T) | grepl('Stomach', colnames(working_dataset), fixed=T) | grepl('Thyroid', colnames(working_dataset), fixed=T) | grepl('Pancreas', colnames(working_dataset), fixed=T) | grepl('Spleen', colnames(working_dataset), fixed=T) | grepl('Muscle - Skeletal', colnames(working_dataset), fixed=T) | grepl('Pituitary', colnames(working_dataset), fixed=T) | grepl('Artery - Coronary', colnames(working_dataset), fixed=T) | grepl('Liver', colnames(working_dataset), fixed=T) | grepl('Kidney - Cortex', colnames(working_dataset), fixed=T) | grepl('Heart - Left Ventricle', colnames(working_dataset), fixed=T) | grepl('Colon - Transverse', colnames(working_dataset), fixed=T) | grepl('Colon - Sigmoid', colnames(working_dataset), fixed=T) | grepl('Adrenal Gland', colnames(working_dataset), fixed=T) |  grepl('Artery - Aorta', colnames(working_dataset), fixed=T),]
     
-    
     tissue1 <- working_dataset[,colnames(working_dataset) %in% origin_gene_tissue]
+   
     
-    
+
     #tissue1 = tissue1[row.names(tissue1) %in% row.names(tissue2),]
     #tissue2 = tissue2[row.names(tissue2) %in% row.names(tissue1),]
     progress$set(value = 2)
@@ -820,7 +820,47 @@ server <- function(input, output, session) {
         }
       }, error = function(e) {
         # Display an error message if an error occurs
-        shinyalert("Oops","The selected tissue do not contain enough genes to generate the enrichment. Please select again.", type = "error")
+        
+        shinyalert("Oops","The selected tissue do not contain enough genes to generate the negative enrichment. Please select again.", type = "error")
+        
+        tryCatch({
+          enriched1<-f_e1(sig_table(),input$selected_tissue,input$selected_q)
+          plots_en1<- enriched1 %>%
+            purrr::map(~plotEnrich(.x, showTerms = 10, numChar = 30, y = "Count", orderBy = "P.value") 
+                       + ggtitle(paste0('Positive gene correlations with ', input$origin_gene, ' ',input$origin_tissue, ' ', 'GO_Biological_Process_2021')))
+          progress$set(value = 2)
+          en1(enriched1)
+          enriched2<-f_e2(sig_table(),input$selected_tissue,input$selected_q)
+          plots_en2<- enriched2 %>%
+            purrr::map(~plotEnrich(.x, showTerms = 10, numChar = 30, y = "Count", orderBy = "P.value")
+                       + ggtitle(paste0('Positive gene correlations with ', input$origin_gene, ' ', input$origin_tissue, ' ','Reactome_2022')))
+          en2(enriched2)
+        plots_all<-c(plots_en1,plots_en2)
+        plots(plots_all)
+        output[['plots.en']]<-renderUI({
+          plot_output_list <- lapply(1:length(plots_all), function(i) {
+            plotname <- paste("en", i, sep="")
+            plotOutput(plotname)
+          })
+          plot_output_list$btn_down<- downloadButton("download", "Download Image")
+          plot_output_list$table<-downloadButton("table", "Download Table")
+          do.call(tagList, plot_output_list)
+        }
+        )
+
+        for (i in 1:length(plots_all)) {
+          local({
+            my_i <- i
+            plotname <- paste("en", my_i, sep="")
+            output[[plotname]] <- renderPlot({
+              plots_all[[my_i]]
+            })
+          })
+        }
+        }, error = function(e) {
+          shinyalert("Oops!","The selected tissue do not contain enough genes to generate positive the enrichment. Please select again.", type = "error")
+        })
+        
       })
       
       progress$set(value = 5)
@@ -839,3 +879,4 @@ server <- function(input, output, session) {
 }
 
 shinyApp(ui, server)
+
