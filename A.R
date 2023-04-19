@@ -406,7 +406,12 @@ server <- function(input, output, session) {
     #tissue1 = tissue1[row.names(tissue1) %in% row.names(tissue2),]
     #tissue2 = tissue2[row.names(tissue2) %in% row.names(tissue1),]
     progress$set(value = 2)
-    full_cors = bicorAndPvalue(tissue1, tissue2, use = 'p')
+    tryCatch({
+      full_cors = bicorAndPvalue(tissue1, tissue2, use = 'p')
+    }, error = function(e) {
+      shinyalert("Oops!","Plese input a official NBCI gene symbol.", type = "error")
+    })
+    
     progress$set(value = 3)
     cor_table = reshape2::melt(full_cors$bicor)
     new_p = reshape2::melt(full_cors$p)
