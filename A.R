@@ -111,9 +111,34 @@ t2<-function(){
             shinydashboard::box(
               title = "Scatter plot",
               width = 12,
-              verbatimTextOutput('gene1'),
-              actionButton('sc', class = "btn-primary", 'Start plot'),
-              plotOutput('sc')
+              textInput("gene_sc","Input a gene for scatter plot, please use Official NBCI gene symbol",value = "ADIPOQ"),
+              selectInput(
+                "tissue_sc",
+                "Select a tissue",
+                c(Adipose_Subcutaneous="Adipose - Subcutaneous",
+                  Adipose_Visceral = "Adipose - Visceral (Omentum)", 
+                  Adrenal_Gland = "Adrenal Gland", 
+                  Artery_Aorta = "Artery - Aorta", 
+                  Artery_Coronary = "Artery - Coronary", 
+                  Brain_Hippocampus = "Brain - Hippocampus", 
+                  Brain_Hypothalamus = "Brain - Hypothalamus", 
+                  Colon_Transverse = "Colon - Transverse", 
+                  Colon_Sigmoid = "Colon - Sigmoid", 
+                  Heart_Left_Ventricle = "Heart - Left Ventricle", 
+                  Kidney_Cortex = "Kidney - Cortex", 
+                  Liver = "Liver", 
+                  Lung = "Lung", 
+                  Muscle_Skeletal = "Muscle - Skeletal", 
+                  Spleen = "Spleen", 
+                  Small_Intestine_Terminal_Ileum = "Small Intestine - Terminal Ileum", 
+                  Stomach = "Stomach", 
+                  Thyroid = "Thyroid", 
+                  Pancreas = "Pancreas", 
+                  Pituitary = "Pituitary")
+              ),
+              actionButton('scb', class = "btn-primary", 'Start plot'),
+              plotOutput('sc'),
+              downloadButton("SCP", "Download Image")
             ),
             sliderInput(inputId = "within",label = "How many within tissue gene numbers you want to input in the network",value = 30, min = 1, max = 50),
             sliderInput(inputId = "external",label = "How many peripheral tissue gene numbers you want to input in the network",value = 100, min = 1, max = 150),
@@ -563,12 +588,10 @@ server <- function(input, output, session) {
   }
   )
   
-  observeEvent( input$sc, {
-    if(!is.null(input$selected_gene)){
-      origin_gene<-input$origin_gene
-      origin_tissue=input$origin_tissue
-      origin_gene_tissue = paste0(origin_gene, '_', origin_tissue)
-      select_gene2 = input$selected_gene
+  observeEvent( input$scb, {
+    if(!is.null(input$gene_sc)){
+      origin_gene_tissue = paste0(input$origin_gene, '_', input$origin_tissue)
+      select_gene2 = paste0(input$gene_sc, '_', input$tissue_sc)
       working_dataset<-working_dataset()
       scat_gene_set1 = working_dataset[,  colnames(working_dataset) %in% origin_gene_tissue]
       scat_gene_set2 = working_dataset[,  colnames(working_dataset) %in% select_gene2]
@@ -576,26 +599,21 @@ server <- function(input, output, session) {
       scat_df = as.data.frame(cbind(scat_gene_set1, scat_gene_set2))
       colnames(scat_df) = c('sgene_1', 'sgene2')
       cc1 = bicorAndPvalue(scat_df$sgene2, scat_df$sgene_1)
- 
-        output$sc<-renderPlot({
-            ggplot(scat_df, aes(x=sgene_1, y=sgene2)) + theme_classic() +  geom_hex(bins = 100) + scale_fill_distiller(palette = "Blues", direction=-1)+ geom_smooth(method = 'lm', color = "darkorange")+  ggtitle(paste0(origin_gene_tissue, ' ~ ', select_gene2, ' r=', round(cc1$bicor, 3), ' p=', signif(cc1$p, 3))) + xlab(paste0('Normalized ', origin_gene_tissue, ' expression')) + ylab(paste0('Normalized ', select_gene2, ' expression')) 
-            
+      sc<-ggplot(scat_df, aes(x=sgene_1, y=sgene2)) + theme_classic() +  geom_hex(bins = 100) + scale_fill_distiller(palette = "Blues", direction=-1)+ geom_smooth(method = 'lm', color = "darkorange")+  ggtitle(paste0(origin_gene_tissue, ' ~ ', select_gene2, ' r=', round(cc1$bicor, 3), ' p=', signif(cc1$p, 3))) + xlab(paste0('Normalized ', origin_gene_tissue, ' expression')) + ylab(paste0('Normalized ', select_gene2, ' expression')) 
+      output$sc<-renderPlot({
+        sc
+      }
+      )
+      output$SCP <- downloadHandler(
+        filename = function() {
+          "Scatter.png"
+        },
+        content = function(file) {
+          ggsave(file, plot = sc, device = "png", width = 9, height = 6)
         }
-        )
-        progress$set(value = 4)
-        for (i in 1:length(plots_all)) {
-          local({
-            my_i <- i
-            plotname <- paste("en", my_i, sep="")
-            output[[plotname]] <- renderPlot({
-              plots_all[[my_i]]
-            })
-          })
-        }
-      
-      progress$set(value = 5)
+      )
     } else {
-      shinyalert("Warning!", "Please first click the bar chart body to selected an gene-tissue.", type = "warning")
+      shinyalert("Warning!", "Please first input an gene-tissue.", type = "warning")
     }
   })
   
@@ -806,29 +824,6 @@ server <- function(input, output, session) {
     }
   })
   
-  output$download <- downloadHandler(
-    filename = function() {
-      paste("Plots-", Sys.Date(), ".zip", sep="")
-    },
-    content = function(file) {
-      owd <- setwd(tempdir())
-      on.exit(setwd(owd))
-      plots<-plots()
-      for(i in 1:length(plots)){
-        ggsave( paste0('plot',i,'.png'), plot = plots[[i]], device = "png", width = 12, height = 9)
-      }
-      zip::zip(file,paste0('plot',1:length(plots),'.png'))
-    }
-  )
-  
-  output$table<- downloadHandler(
-    filename = function() {
-      paste("Enrichments-", Sys.Date(), ".xlsx", sep="")
-    },
-    content = function(file) {
-      write_xlsx(list(positive_GO_Biological_process = en1()[[1]], Positive_Reactome = en2()[[1]], Negative_GO_Biological_process = en3()[[1]], Negative_Reactome = en4()[[1]]), path = file)
-    }
-  )
   
   #tip
   observeEvent(input$tabs, {
