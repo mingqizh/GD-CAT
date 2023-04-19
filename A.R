@@ -767,7 +767,7 @@ server <- function(input, output, session) {
     if(!is.null(input$selected_tissue)){
       progress <- Progress$new(session, min=0, max=5)
       on.exit(progress$close())
-      progress$set(message = 'Gnerating the enrichements',
+      progress$set(message = 'Generating the enrichements',
                    detail = 'Just wait a second')
       progress$set(value = 1)
       tryCatch({
