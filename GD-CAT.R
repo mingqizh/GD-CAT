@@ -903,7 +903,29 @@ server <- function(input, output, session) {
       shinyalert("Warning!", "Please first click the Pie chart body to selected an tissue.", type = "warning")
     }
   })
-  
+    output$download <- downloadHandler(
+    filename = function() {
+      paste("Plots-", Sys.Date(), ".zip", sep="")
+    },
+    content = function(file) {
+      owd <- setwd(tempdir())
+      on.exit(setwd(owd))
+      plots<-plots()
+      for(i in 1:length(plots)){
+        ggsave( paste0('plot',i,'.png'), plot = plots[[i]], device = "png", width = 12, height = 9)
+      }
+      zip::zip(file,paste0('plot',1:length(plots),'.png'))
+    }
+  )
+
+  output$table<- downloadHandler(
+    filename = function() {
+      paste("Enrichments-", Sys.Date(), ".xlsx", sep="")
+    },
+    content = function(file) {
+      write_xlsx(list(positive_GO_Biological_process = en1()[[1]], Positive_Reactome = en2()[[1]], Negative_GO_Biological_process = en3()[[1]], Negative_Reactome = en4()[[1]]), path = file)
+    }
+  )
   
   #tip
   observeEvent(input$tabs, {
