@@ -31,7 +31,12 @@ library(gridExtra)
 library(ggpubr)
 library(writexl)
 allowWGCNAThreads()
+## load data
+load("working_dataset.RData")
+met_dat = read.delim('GTEx_Analysis_v8_Annotations_SubjectPhenotypesDS.txt')
+sc_matrix = read.csv('full pan-tissue DECON abundances.csv')
 
+## setting header & sidebar
 header <- function(){
   dashboardHeader(title = "Welcome to GD-CAT!")
 }
@@ -44,7 +49,7 @@ sidebar <- function(){
       menuItem("Instruction",  tabName = "t2",icon = icon("dashboard")),
       menuItem("Settings",  tabName = "t2",icon = icon("dashboard"))
     ),
-    radioButtons(inputId = "specie",label = "Choose a species",choices = c("Human","Mouse(coming soon)")),
+    radioButtons(inputId = "specie",label = "Choose a specie",choices = c("Human","Mouse(coming soon)")),
     radioButtons("Gender", "Choose Sex",c("Both"="both","Male"="male", "Female"="female")),
     textInput("origin_gene","origin_gene, Official NBCI gene symbol",value = "ADIPOQ"),
     selectInput(
@@ -92,8 +97,7 @@ t2<-function(){
             shinydashboard::box(
               title = "Enrichement Analysis",
               width = 12,
-              verbatimTextOutput('text'), 
-              verbatimTextOutput('gene1'),
+              verbatimTextOutput('text'),
               actionButton('btn', class = "btn-primary", 'Start Analysis'),
               uiOutput('plots.en')
             ),
@@ -109,6 +113,38 @@ t2<-function(){
                    tabPanel('Top-ranked genes',echarts4rOutput('plot.top1')),
                    tabPanel('Top-ranked genes without origin tissue',echarts4rOutput('plot.top2'))
             ),
+            shinydashboard::box(
+              title = "Scatter plot",
+              width = 12,
+              textInput("gene_sc","Input a gene for scatter plot, please use Official NBCI gene symbol",value = "ADIPOQ"),
+              selectInput(
+                "tissue_sc",
+                "Select a tissue",
+                c(Adipose_Subcutaneous="Adipose - Subcutaneous",
+                  Adipose_Visceral = "Adipose - Visceral (Omentum)", 
+                  Adrenal_Gland = "Adrenal Gland", 
+                  Artery_Aorta = "Artery - Aorta", 
+                  Artery_Coronary = "Artery - Coronary", 
+                  Brain_Hippocampus = "Brain - Hippocampus", 
+                  Brain_Hypothalamus = "Brain - Hypothalamus", 
+                  Colon_Transverse = "Colon - Transverse", 
+                  Colon_Sigmoid = "Colon - Sigmoid", 
+                  Heart_Left_Ventricle = "Heart - Left Ventricle", 
+                  Kidney_Cortex = "Kidney - Cortex", 
+                  Liver = "Liver", 
+                  Lung = "Lung", 
+                  Muscle_Skeletal = "Muscle - Skeletal", 
+                  Spleen = "Spleen", 
+                  Small_Intestine_Terminal_Ileum = "Small Intestine - Terminal Ileum", 
+                  Stomach = "Stomach", 
+                  Thyroid = "Thyroid", 
+                  Pancreas = "Pancreas", 
+                  Pituitary = "Pituitary")
+              ),
+              actionButton('scb', class = "btn-primary", 'Start plot'),
+              plotOutput('sc'),
+              downloadButton("SCP", "Download Image")
+            ),
             sliderInput(inputId = "within",label = "How many within tissue gene numbers you want to input in the network",value = 30, min = 1, max = 50),
             sliderInput(inputId = "external",label = "How many peripheral tissue gene numbers you want to input in the network",value = 100, min = 1, max = 150),
             shinydashboard::box(
@@ -121,7 +157,7 @@ t2<-function(){
           )
   )
 }
-
+# setting web body
 body <- function(){
   dashboardBody(
     tabItems(
@@ -130,8 +166,11 @@ body <- function(){
   )
 }
 
+#combine as UI
 ui<-dashboardPage(header(), sidebar(), body())
 
+## preset functions for analysis 
+#generate pie chart with all tissues and genes
 f1<-function(annot, col_scheme){
   
   
@@ -178,7 +217,7 @@ f1<-function(annot, col_scheme){
     })
   return(list(data=data,echart=echart))
 }
-
+#generate pie chart with origin tissue and gene removed
 f2<-function(annot,origin_tissue, col_scheme){
   annot<-annot[!grepl(origin_tissue, annot$tissue_2),]
   sig_table=annot
@@ -226,6 +265,7 @@ f2<-function(annot,origin_tissue, col_scheme){
   return(list(data=data,echart=echart))
 }
 
+#  positive enrichment 
 f_e1 <- function(annot,select_tissue,q){
   pp1 = annot[annot$qvalue<as.numeric(q),]
   pp1 = pp1[pp1$bicor>0,]
@@ -259,6 +299,7 @@ f_e2 <- function(annot,select_tissue,q){
   
 }
 
+# negative enrichment 
 f_e3 <- function(annot,select_tissue,q){
   pp1 = annot[annot$qvalue<as.numeric(q),]
   pp1 = pp1[pp1$bicor<0,]
@@ -291,7 +332,7 @@ f_e4 <- function(annot,select_tissue,q){
   
   
 }
-sc_matrix = read.csv('drive-download-20230412T194119Z-001/full pan-tissue DECON abundances.csv')
+# cell type distribution 
 get_cell<-function(working_dataset, sig_table, origin_gene, origin_tissue,col_scheme){
   #read in sc-seq matrix 
   sc_matrix = sc_matrix
@@ -322,6 +363,8 @@ get_cell<-function(working_dataset, sig_table, origin_gene, origin_tissue,col_sc
   top_genes2$color = col_scheme[match(top_genes2$tissue, names(col_scheme))]
   top_genes2 = top_genes2[order(abs(top_genes2$bicor), decreasing = T),]
 }
+
+# top genes
 get_top_genes1<-function(sig_table,max_gene_length, col_scheme){
   top_genes = sig_table[1:max_gene_length,]
   top_genes$color = col_scheme[match(top_genes$tissue_2, names(col_scheme))]
@@ -335,8 +378,8 @@ get_top_genes2<-function(sig_table,max_gene_length,origin_tissue, col_scheme){
   
   top_genes
 }
-load("working_dataset.RData")
-met_dat = read.delim('GTEx_Analysis_v8_Annotations_SubjectPhenotypesDS.txt')
+
+# setting the server
 server <- function(input, output, session) {
   working_dataset<-eventReactive(input$import,{
     
@@ -368,14 +411,19 @@ server <- function(input, output, session) {
     
     tissue2 <- working_dataset[,grepl('Adipose - Subcutaneous', colnames(working_dataset)) | grepl('Adipose - Visceral (Omentum)', colnames(working_dataset), fixed=T) | grepl('Brain - Hypothalamus', colnames(working_dataset)) | grepl('Brain - Hippocampus', colnames(working_dataset)) | grepl('Small Intestine - Terminal Ileum', colnames(working_dataset), fixed=T) | grepl('Stomach', colnames(working_dataset), fixed=T) | grepl('Thyroid', colnames(working_dataset), fixed=T) | grepl('Pancreas', colnames(working_dataset), fixed=T) | grepl('Spleen', colnames(working_dataset), fixed=T) | grepl('Muscle - Skeletal', colnames(working_dataset), fixed=T) | grepl('Pituitary', colnames(working_dataset), fixed=T) | grepl('Artery - Coronary', colnames(working_dataset), fixed=T) | grepl('Liver', colnames(working_dataset), fixed=T) | grepl('Kidney - Cortex', colnames(working_dataset), fixed=T) | grepl('Heart - Left Ventricle', colnames(working_dataset), fixed=T) | grepl('Colon - Transverse', colnames(working_dataset), fixed=T) | grepl('Colon - Sigmoid', colnames(working_dataset), fixed=T) | grepl('Adrenal Gland', colnames(working_dataset), fixed=T) |  grepl('Artery - Aorta', colnames(working_dataset), fixed=T),]
     
-    
     tissue1 <- working_dataset[,colnames(working_dataset) %in% origin_gene_tissue]
+   
     
-    
+
     #tissue1 = tissue1[row.names(tissue1) %in% row.names(tissue2),]
     #tissue2 = tissue2[row.names(tissue2) %in% row.names(tissue1),]
     progress$set(value = 2)
-    full_cors = bicorAndPvalue(tissue1, tissue2, use = 'p')
+    tryCatch({
+      full_cors = bicorAndPvalue(tissue1, tissue2, use = 'p')
+    }, error = function(e) {
+      shinyalert("Oops!","Plese input a official NBCI gene symbol.", type = "error")
+    })
+    
     progress$set(value = 3)
     cor_table = reshape2::melt(full_cors$bicor)
     new_p = reshape2::melt(full_cors$p)
@@ -518,15 +566,19 @@ server <- function(input, output, session) {
       e_toolbox()%>%
       e_toolbox_feature(feature = "saveAsImage",title='Save')%>%
       e_on(
-        "click",
-        "function(params) {
-       Shiny.setInputValue('selected_gene', params.name, {priority: 'event'});
-     }"
+        list(seriesName = bicor),
+        "function(x){
+          //alert(Object.keys(x));
+          var msg = [x.seriesIndex,x.seriesName,x.name,x.dataIndex]
+          //alert(msg)
+          Shiny.setInputValue('selected_g',x.name, {priority: 'event'})
+          Shiny.setInputValue('selected_gene',x.seriesName, {priority: 'event'});
+        }"
       )
   }
   )
   output$gene1 <- renderText({
-    input$selected_gene
+    print(c('You selected gene-tissue:',input$selected_gene))
   })
   output$plot.top2<- renderEcharts4r({
     top_genes2<-get_top_genes2(sig_table(),input$topn,input$origin_tissue, col_scheme())
@@ -535,6 +587,7 @@ server <- function(input, output, session) {
       arrange(desc(abs(bicor))) %>%
       e_chart(gene_tissue_2, width='300px', height = NULL) %>%
       e_bar(bicor) %>%
+      e_legend(show=F) %>%
       e_add_nested("itemStyle", color) %>%
       e_grid(bottom="100px") %>%
       e_x_axis(axisLabel = list(interval = 0, rotate = 45)) %>%
@@ -551,6 +604,47 @@ server <- function(input, output, session) {
       e_toolbox_feature(feature = "saveAsImage",title='Save')
   }
   )
+  
+  # scatter plot
+  observeEvent( input$scb, {
+    if(!is.null(input$gene_sc)){
+      
+      isolate({
+        origin_gene_tissue = paste0(input$origin_gene, '_', input$origin_tissue)
+      select_gene2 = paste0(input$gene_sc, '_', input$tissue_sc)
+        
+      })
+        
+      working_dataset<-working_dataset()
+      scat_gene_set1 = working_dataset[,  colnames(working_dataset) %in% origin_gene_tissue]
+      scat_gene_set2 = working_dataset[,  colnames(working_dataset) %in% select_gene2]
+      
+      scat_df = as.data.frame(cbind(scat_gene_set1, scat_gene_set2))
+      tryCatch({
+      colnames(scat_df) = c('sgene_1', 'sgene2')
+      cc1 = bicorAndPvalue(scat_df$sgene2, scat_df$sgene_1)
+      sc<-ggplot(scat_df, aes(x=sgene_1, y=sgene2)) + theme_classic() +  geom_hex(bins = 100) + scale_fill_distiller(palette = "Blues", direction=-1)+ geom_smooth(method = 'lm', color = "darkorange")+  ggtitle(paste0(origin_gene_tissue, ' ~ ', select_gene2, ' r=', round(cc1$bicor, 3), ' p=', signif(cc1$p, 3))) + xlab(paste0('Normalized ', origin_gene_tissue, ' expression')) + ylab(paste0('Normalized ', select_gene2, ' expression')) 
+      output$sc<-renderPlot({
+        sc
+      }
+      )
+      output$SCP <- downloadHandler(
+        filename = function() {
+          "Scatter.png"
+        },
+        content = function(file) {
+          ggsave(file, plot = sc, device = "png", width = 9, height = 6)
+        }
+      )
+      
+      }, error= function(e) {
+        shinyalert("Oops!","Plese input a official NBCI gene symbol.", type = "error")
+      })
+    } else {
+      
+      shinyalert("Warning!", "Please first input an gene-tissue.", type = "warning")
+    }
+  })
   
   net<-eventReactive(input$btn1,{
     progress <- Progress$new(session, min=0, max=5)
@@ -702,25 +796,36 @@ server <- function(input, output, session) {
       progress$set(value = 1)
       tryCatch({
         # Your plot code here
-        enriched1<-f_e1(sig_table(),input$selected_tissue,input$selected_q)
+        isolate({
+          enriched1<-f_e1(sig_table(),input$selected_tissue,input$selected_q)
+        })
+        
         plots_en1<- enriched1 %>%
           purrr::map(~plotEnrich(.x, showTerms = 10, numChar = 30, y = "Count", orderBy = "P.value") 
                      + ggtitle(paste0('Positive gene correlations with ', input$origin_gene, ' ',input$origin_tissue, ' ', 'GO_Biological_Process_2021')))
         progress$set(value = 2)
         en1(enriched1)
-        enriched2<-f_e2(sig_table(),input$selected_tissue,input$selected_q)
+        isolate({
+          enriched2<-f_e2(sig_table(),input$selected_tissue,input$selected_q)
+        })
+        
         plots_en2<- enriched2 %>%
           purrr::map(~plotEnrich(.x, showTerms = 10, numChar = 30, y = "Count", orderBy = "P.value")
                      + ggtitle(paste0('Positive gene correlations with ', input$origin_gene, ' ', input$origin_tissue, ' ','Reactome_2022')))
         en2(enriched2)
+        isolate({
+          enriched3<-f_e3(sig_table(),input$selected_tissue,input$selected_q)
+        })
         
-        enriched3<-f_e3(sig_table(),input$selected_tissue,input$selected_q)
         plots_en3<- enriched3 %>%
           purrr::map(~plotEnrich(.x, showTerms = 10, numChar = 30, y = "Count", orderBy = "P.value") 
                      + ggtitle(paste0('Negative gene correlations with ', input$origin_gene, ' ',input$origin_tissue, ' ', 'GO_Biological_Process_2021')))
         
         en3(enriched3)
-        enriched4<-f_e4(sig_table(),input$selected_tissue,input$selected_q)
+        isolate({
+          enriched4<-f_e4(sig_table(),input$selected_tissue,input$selected_q)
+        })
+        
         plots_en4<- enriched4 %>%
           purrr::map(~plotEnrich(.x, showTerms = 10, numChar = 30, y = "Count", orderBy = "P.value")
                      + ggtitle(paste0('Negative gene correlations with ', input$origin_gene, ' ', input$origin_tissue, ' ','Reactome_2022')))
@@ -750,7 +855,47 @@ server <- function(input, output, session) {
         }
       }, error = function(e) {
         # Display an error message if an error occurs
-        shinyalert("Oops","The selected tissue do not contain enough genes to generate the enrichment. Please select again.", type = "error")
+        
+        shinyalert("Oops","The selected tissue do not contain enough genes to generate the negative enrichment. Please select again.", type = "error")
+        
+        tryCatch({
+          enriched1<-f_e1(sig_table(),input$selected_tissue,input$selected_q)
+          plots_en1<- enriched1 %>%
+            purrr::map(~plotEnrich(.x, showTerms = 10, numChar = 30, y = "Count", orderBy = "P.value") 
+                       + ggtitle(paste0('Positive gene correlations with ', input$origin_gene, ' ',input$origin_tissue, ' ', 'GO_Biological_Process_2021')))
+          progress$set(value = 2)
+          en1(enriched1)
+          enriched2<-f_e2(sig_table(),input$selected_tissue,input$selected_q)
+          plots_en2<- enriched2 %>%
+            purrr::map(~plotEnrich(.x, showTerms = 10, numChar = 30, y = "Count", orderBy = "P.value")
+                       + ggtitle(paste0('Positive gene correlations with ', input$origin_gene, ' ', input$origin_tissue, ' ','Reactome_2022')))
+          en2(enriched2)
+        plots_all<-c(plots_en1,plots_en2)
+        plots(plots_all)
+        output[['plots.en']]<-renderUI({
+          plot_output_list <- lapply(1:length(plots_all), function(i) {
+            plotname <- paste("en", i, sep="")
+            plotOutput(plotname)
+          })
+          plot_output_list$btn_down<- downloadButton("download", "Download Image")
+          plot_output_list$table<-downloadButton("table", "Download Table")
+          do.call(tagList, plot_output_list)
+        }
+        )
+
+        for (i in 1:length(plots_all)) {
+          local({
+            my_i <- i
+            plotname <- paste("en", my_i, sep="")
+            output[[plotname]] <- renderPlot({
+              plots_all[[my_i]]
+            })
+          })
+        }
+        }, error = function(e) {
+          shinyalert("Oops!","The selected tissue do not contain enough genes to generate positive the enrichment. Please select again.", type = "error")
+        })
+        
       })
       
       progress$set(value = 5)
@@ -759,29 +904,6 @@ server <- function(input, output, session) {
     }
   })
   
-  output$download <- downloadHandler(
-    filename = function() {
-      paste("Plots-", Sys.Date(), ".zip", sep="")
-    },
-    content = function(file) {
-      owd <- setwd(tempdir())
-      on.exit(setwd(owd))
-      plots<-plots()
-      for(i in 1:length(plots)){
-        ggsave( paste0('plot',i,'.png'), plot = plots[[i]], device = "png", width = 12, height = 9)
-      }
-      zip::zip(file,paste0('plot',1:length(plots),'.png'))
-    }
-  )
-  
-  output$table<- downloadHandler(
-    filename = function() {
-      paste("Enrichments-", Sys.Date(), ".xlsx", sep="")
-    },
-    content = function(file) {
-      write_xlsx(list(positive_GO_Biological_process = en1()[[1]], Positive_Reactome = en2()[[1]], Negative_GO_Biological_process = en3()[[1]], Negative_Reactome = en4()[[1]]), path = file)
-    }
-  )
   
   #tip
   observeEvent(input$tabs, {
@@ -791,4 +913,5 @@ server <- function(input, output, session) {
   })
 }
 
+#run the app
 shinyApp(ui, server)
