@@ -152,7 +152,8 @@ t2<-function(){
               width = 12,
               actionButton('btn1', class = "btn-primary", 'Start Analysis'),
               tabPanel('Chart',plotOutput('net')),
-              downloadButton("PDFPlot", "Download PDF")
+              downloadButton("PDFPlot", "Download PDF"),
+              downloadButton("netgene", "Download gene lists")
             )
           )
   )
@@ -646,7 +647,7 @@ server <- function(input, output, session) {
     }
   })
   
-  net<-eventReactive(input$btn1,{
+  observeEvent(input$btn1,{
     progress <- Progress$new(session, min=0, max=5)
     on.exit(progress$close())
     progress$set(message = 'Gnerating the enrichement',
@@ -708,21 +709,107 @@ server <- function(input, output, session) {
     cols_set$cols = map1$cols[match(row.names(cols_set), map1$gene_tissue_1)]
     cols_set$cols = ifelse(row.names(cols_set) %in% origin_gene_tissue, 'gray5', paste0(cols_set$cols))
     
-    qgraph(map2, minimum = 0.5, cut = 0.85, vsize = 3, color=cols_set$cols, legend = F, borders = TRUE, layout='spring', posCol = "dodgerblue3", negCol = "firebrick3", label.cex=4, directed=F, labels = colnames(map2)) 
+    output$net<-renderPlot({
+      qgraph(map2, minimum = 0.5, cut = 0.85, vsize = 3, color=cols_set$cols, legend = F, borders = TRUE, layout='spring', posCol = "dodgerblue3", negCol = "firebrick3", label.cex=4, directed=F, labels = colnames(map2)) 
+    })
+    output$PDFPlot <- downloadHandler(
+      filename = function() {
+        paste("Net-", Sys.Date(), ".pdf", sep="")
+      },
+      content = function(file) {
+        pdf(file)
+        plot(net())
+        dev.off()
+      }
+    )
   })
-  output$net<-renderPlot({
-    net()
+  
+  observeEvent(input$btn1,{
+    progress <- Progress$new(session, min=0, max=5)
+    on.exit(progress$close())
+    progress$set(message = 'Gnerating the network plot',
+                 detail = 'Just wait a second')
+    progress$set(value = 1)
+    isolate({
+      number_orig_gene =as.numeric(input$within) 
+      number_peripheral_genes =as.numeric(input$external) 
+      sig_table<-sig_table()
+      working_dataset<-working_dataset()
+      origin_gene<-input$origin_gene
+      origin_tissue=input$origin_tissue
+    })
+    
+    origin_gene_tissue = paste0(origin_gene, '_', origin_tissue)
+    col_scheme<- col_scheme()
+    origin_pull = sig_table[sig_table$tissue_2==origin_tissue,]
+    orig_network_genes = as.vector(origin_pull$gene_tissue_2[1:number_orig_gene])
+    peripheral_pull = sig_table[!sig_table$tissue_2==origin_tissue,]
+    periph_network_genes = as.vector(peripheral_pull$gene_tissue_2[1:number_peripheral_genes])
+    sql_pull_list = c(origin_gene_tissue, orig_network_genes, periph_network_genes)
+    
+    progress$set(value = 2)
+    
+    tissue1 <- working_dataset[, colnames(working_dataset)  %in% sql_pull_list]
+    full_cors = bicorAndPvalue(tissue1, tissue1, use = 'p')
+    cor_table = reshape2::melt(full_cors$bicor)
+    new_p = reshape2::melt(full_cors$p)
+    colnames(cor_table) = c('gene_tissue_1', 'gene_tissue_2', 'bicor')
+    
+    progress$set(value = 3)
+    #can drop here to clear CPU
+    full_cors=NULL
+    cor_table$pvalue = signif(new_p$value, 3)
+    cor_table$bicor = round(cor_table$bicor, 3)
+    cor_table = cor_table[!cor_table$gene_tissue_1==cor_table$gene_tissue_2,]
+    cor_table$qvalue = signif(p.adjust(cor_table$pvalue, "BH"), 3)
+    cor_table = cor_table[order(cor_table$qvalue, decreasing=F),]
+    cor_table = na.omit(cor_table)
+    cor_table$gene_symbol_1 = gsub("\\_.*","",cor_table$gene_tissue_1)
+    cor_table$tissue_1 = gsub(".*_","",cor_table$gene_tissue_1)
+    cor_table = cor_table[!is.na(cor_table$tissue_1),]
+    cor_table$gene_symbol_2 = gsub("\\_.*","",cor_table$gene_tissue_2)
+    cor_table$tissue_2 = gsub(".*_","",cor_table$gene_tissue_2)
+    cor_table = cor_table[!is.na(cor_table$tissue_2),]
+    sql_pull_2 = cor_table
+    
+    progress$set(value = 4)
+    ######################################
+    #the new SQL pull table is not listed as sql_pull_2
+    #this will take work on your end to interface with pulling the correct genes from tissue_1 based on the number selected in the app.  I arbitrarily chose 10 here and you obviously wouldn't jsut apply top_n since it will differ.  The final list is called network_gene_lsit
+    map1 = sql_pull_2
+    map1$cols = col_scheme[match(map1$tissue_1, names(col_scheme))]
+    map2 = dcast(map1, gene_tissue_1 ~ gene_tissue_2, value.var = 'bicor', fun.aggregate = mean)
+    row.names(map2) = map2$gene_tissue_1
+    map3<-map2
+    
+    map2$gene_tissue_1 = NULL
+    cols_set = as.data.frame(row.names(map2))
+    row.names(cols_set) = row.names(map2)
+    cols_set$cols = map1$cols[match(row.names(cols_set), map1$gene_tissue_1)]
+    cols_set$cols = ifelse(row.names(cols_set) %in% origin_gene_tissue, 'gray5', paste0(cols_set$cols))
+    
+    output$net<-renderPlot({
+      qgraph(map2, minimum = 0.5, cut = 0.85, vsize = 3, color=cols_set$cols, legend = F, borders = TRUE, layout='spring', posCol = "dodgerblue3", negCol = "firebrick3", label.cex=4, directed=F, labels = colnames(map2)) 
+    })
+    output$PDFPlot <- downloadHandler(
+      filename = function() {
+        paste("Net-", Sys.Date(), ".pdf", sep="")
+      },
+      content = function(file) {
+        pdf(file)
+        plot(net())
+        dev.off()
+      }
+    )
+    output$netgene<- downloadHandler(
+      filename = function() {
+        paste("Gene list for network plot-", Sys.Date(), ".xlsx", sep="")
+      },
+      content = function(file) {
+        write_xlsx(map3, path = file)
+      }
+    )
   })
-  output$PDFPlot <- downloadHandler(
-    filename = function() {
-      paste("Net-", Sys.Date(), ".pdf", sep="")
-    },
-    content = function(file) {
-      pdf(file)
-      plot(net())
-      dev.off()
-    }
-  )
   #output$table.map2<-renderDT(
   #  get_map2(working_dataset(),sig_table(),input$slicen,input$origin_gene_tissue),
   # extensions = 'Buttons',
@@ -903,7 +990,8 @@ server <- function(input, output, session) {
       shinyalert("Warning!", "Please first click the Pie chart body to selected an tissue.", type = "warning")
     }
   })
-    output$download <- downloadHandler(
+  
+  output$download <- downloadHandler(
     filename = function() {
       paste("Plots-", Sys.Date(), ".zip", sep="")
     },
@@ -917,7 +1005,7 @@ server <- function(input, output, session) {
       zip::zip(file,paste0('plot',1:length(plots),'.png'))
     }
   )
-
+  
   output$table<- downloadHandler(
     filename = function() {
       paste("Enrichments-", Sys.Date(), ".xlsx", sep="")
@@ -926,7 +1014,6 @@ server <- function(input, output, session) {
       write_xlsx(list(positive_GO_Biological_process = en1()[[1]], Positive_Reactome = en2()[[1]], Negative_GO_Biological_process = en3()[[1]], Negative_Reactome = en4()[[1]]), path = file)
     }
   )
-  
   #tip
   observeEvent(input$tabs, {
     if(input$tabs=='t2'){
