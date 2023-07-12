@@ -15,6 +15,6 @@ Same as the initial settings, make sure you put an official NBCI gene symbol her
 ### Network Analysis
 Move the slider bars to custom the gene numbers for within and peripheral tissue and then process the analysis. <br><br>
 #### Attention
-All the images plus some of the data that generate them can be downloaded. <br><br>
-You should hit the button again to update your settings. 
+- All the images plus some of the data that generate them can be downloaded. <br><br>
+- You should hit the button again to update your settings. 
 
