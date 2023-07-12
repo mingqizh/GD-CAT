@@ -14,7 +14,7 @@ After the processing of the original data, you can see the pie chart where the g
 ![pie](https://github.com/mingqizh/GD-CAT/blob/main/images/sfd.png)<br><br>
 ### Enrichment Analysis
 To generate the enrichment analysis of the second part, users should click the pie chart body to select a tissue and threshold first. Your choice will be displayed then in this section. Then users can hit the "Start Analysis" button to see the results. <br><br>
-![enrichment](https://github.com/mingqizh/GD-CAT/blob/main/images/1689177626311.png)<br><br>
+![enrichment](https://github.com/mingqizh/GD-CAT/blob/main/images/enrich.png)<br><br>
 ### Scatter Plot
 Same as the initial settings, make sure you put an official NBCI gene symbol here. <br><br>
 ![scatter](https://github.com/mingqizh/GD-CAT/blob/main/images/1689177689112.png)<br><br>
