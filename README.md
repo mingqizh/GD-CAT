@@ -11,7 +11,7 @@ First start from the dashboard. Select the sex that you want and input an NBCI g
 Hit the "process data" button after choosing a tissue. A progress bar will show at the bottom right of the screen. <br><br>
 ![pre](https://github.com/mingqizh/GD-CAT/blob/main/images/1689177951994.png)<br><br>
 After the processing of the original data, you can see the pie chart where the gene is enriched in, age and sex of the cohort, cell type, and top genes. <br><br>
-![pie](https://github.com/mingqizh/GD-CAT/blob/main/images/1689177807129.png)<br><br>
+![pie](https://github.com/mingqizh/GD-CAT/blob/main/images/sfd.png)<br><br>
 ### Enrichment Analysis
 To generate the enrichment analysis of the second part, users should click the pie chart body to select a tissue and threshold first. Your choice will be displayed then in this section. Then users can hit the "Start Analysis" button to see the results. <br><br>
 ![enrichment](https://github.com/mingqizh/GD-CAT/blob/main/images/1689177626311.png)<br><br>
@@ -20,8 +20,8 @@ Same as the initial settings, make sure you put an official NBCI gene symbol her
 ![scatter](https://github.com/mingqizh/GD-CAT/blob/main/images/1689177689112.png)<br><br>
 ### Network Analysis
 Move the slider bars to custom the gene numbers for within and peripheral tissue and then process the analysis. <br><br>
-![net](https://github.com/mingqizh/GD-CAT/blob/main/images/1689177924456.png)
+![net](https://github.com/mingqizh/GD-CAT/blob/main/images/net.png)
 #### Attention
-- All the images plus some of the data that generate them can be downloaded. <br><br>
+- All the images plus some of the data that generate them can be downloaded. The interactive images download buttons are on the top right and for other plots are from the bottom left. <br><br>
 - You should hit the button again to update your settings. 
 
