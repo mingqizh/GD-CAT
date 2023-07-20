@@ -1,5 +1,5 @@
 # GD-CAT
-`GD-CAT`is a shiny-based endocrine genetic web app for tissue cross-talking. 
+`GD-CAT`is a shiny-based endocrine genetic web app for tissue cross-talking. Now we have human data in sex and mouse data in diets. 
 You can select the gene and tissue combination that interests you, and have a look at the demographic characteristics from the cohort of choice.
 and then do the enrichment, scatter plot, single cell and network visualization.  <br><br>
 You can access our app via [GD-CAT](https://pipeline.biochem.uci.edu/gtex/demo2/).<br><br>
