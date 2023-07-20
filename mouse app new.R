@@ -385,67 +385,73 @@ server <- function(input, output, session) {
   
   
   # top n
-  output$plot.top1<- renderEcharts4r({
-    top_genes1<-get_top_genes1(sig_table(),input$topn, col_scheme())
-    
-    top_genes1 %>%
-      arrange(desc(abs(bicor))) %>%
-      e_chart(gene_tissue_2, width='300px', height = NULL) %>%
-      e_bar(bicor) %>%
-      e_legend(show=F) %>%
-      e_add_nested("itemStyle", color) %>%
-      e_grid(bottom="150px") %>%
-      e_x_axis(axisLabel = list(interval = 0, rotate = 45)) %>%
-      e_y_axis(name = "Bicor Values")%>%
-      e_datazoom(type='inside') %>%
-      e_tooltip(
-        trigger = 'item',
-        axisPointer = list(
-          type = "shadow",
-          axis='x'
-        )
-      )%>%
-      e_toolbox()%>%
-      e_toolbox_feature(feature = "saveAsImage",title='Save')%>%
-      e_on(
-        list(seriesName = bicor),
-        "function(x){
+  observeEvent(input$import,{
+    isolate({
+      origin_gene = input$origin_gene
+      origin_tissue = input$origin_tissue
+      origin_gene_tissue = paste0(origin_gene, '_', origin_tissue)
+      working_dataset<-working_dataset()
+    })
+    output$plot.top1<- renderEcharts4r({
+      top_genes1<-get_top_genes1(sig_table(),input$topn, col_scheme())
+      
+      top_genes1 %>%
+        arrange(desc(abs(bicor))) %>%
+        e_chart(gene_tissue_2, width='300px', height = NULL) %>%
+        e_bar(bicor) %>%
+        e_legend(show=F) %>%
+        e_add_nested("itemStyle", color) %>%
+        e_grid(bottom="150px") %>%
+        e_x_axis(axisLabel = list(interval = 0, rotate = 45)) %>%
+        e_y_axis(name = "Bicor Values")%>%
+        e_datazoom(type='inside') %>%
+        e_tooltip(
+          trigger = 'item',
+          axisPointer = list(
+            type = "shadow",
+            axis='x'
+          )
+        )%>%
+        e_toolbox()%>%
+        e_toolbox_feature(feature = "saveAsImage",title='Save')%>%
+        e_on(
+          list(seriesName = bicor),
+          "function(x){
           //alert(Object.keys(x));
           var msg = [x.seriesIndex,x.seriesName,x.name,x.dataIndex]
           //alert(msg)
           Shiny.setInputValue('selected_g',x.name, {priority: 'event'})
           Shiny.setInputValue('selected_gene',x.seriesName, {priority: 'event'});
         }"
-      )
-  }
-  )
-  output$gene1 <- renderText({
-    print(c('You selected gene-tissue:',input$selected_gene))
-  })
-  output$plot.top2<- renderEcharts4r({
-    top_genes2<-get_top_genes2(sig_table(),input$topn,input$origin_tissue, col_scheme())
-    
-    top_genes2 %>%
-      arrange(desc(abs(bicor))) %>%
-      e_chart(gene_tissue_2, width='300px', height = NULL) %>%
-      e_bar(bicor) %>%
-      e_legend(show=F) %>%
-      e_add_nested("itemStyle", color) %>%
-      e_grid(bottom="100px") %>%
-      e_x_axis(axisLabel = list(interval = 0, rotate = 45)) %>%
-      e_y_axis(name = "Bicor Values")%>%
-      e_datazoom(type='inside') %>%
-      e_tooltip(
-        trigger = 'item',
-        axisPointer = list(
-          type = "shadow",
-          axis='x'
         )
-      )%>%
-      e_toolbox()%>%
-      e_toolbox_feature(feature = "saveAsImage",title='Save')
-  }
-  )
+    }
+    )
+    output$plot.top2<- renderEcharts4r({
+      top_genes2<-get_top_genes2(sig_table(),input$topn,input$origin_tissue, col_scheme())
+      
+      top_genes2 %>%
+        arrange(desc(abs(bicor))) %>%
+        e_chart(gene_tissue_2, width='300px', height = NULL) %>%
+        e_bar(bicor) %>%
+        e_legend(show=F) %>%
+        e_add_nested("itemStyle", color) %>%
+        e_grid(bottom="100px") %>%
+        e_x_axis(axisLabel = list(interval = 0, rotate = 45)) %>%
+        e_y_axis(name = "Bicor Values")%>%
+        e_datazoom(type='inside') %>%
+        e_tooltip(
+          trigger = 'item',
+          axisPointer = list(
+            type = "shadow",
+            axis='x'
+          )
+        )%>%
+        e_toolbox()%>%
+        e_toolbox_feature(feature = "saveAsImage",title='Save')
+    }
+    )
+  })
+  
   
   # clinical table
   
