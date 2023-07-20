@@ -270,7 +270,7 @@ t2<-function(){
             tabBox(
               title = "Clinic trait",
               width = 12,
-              tabPanel('Trait Table',tableOutput('trait_t'))
+              tabPanel('Trait Table',DTOutput('trait_t'))
             ),
             sliderInput(inputId = "trait",label = "How many traits you want to see for the correlations",value = 30, min = 1, max = 50),
             shinydashboard::box(
@@ -507,12 +507,10 @@ server <- function(input, output, session) {
     })
     output$trait_b <- downloadHandler(
       filename = function() {
-        paste("Correlations-", Sys.Date(), ".pdf", sep="")
+        "Correlation.png"
       },
       content = function(file) {
-        pdf(file)
-        plot(trait_c())
-        dev.off()
+        ggsave(file, plot = trait_c(), device = "png", width = 9, height = 6)
       }
     )
   })
