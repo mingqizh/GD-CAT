@@ -227,6 +227,7 @@ sidebar <- function(){
       menuItem("Instruction",  tabName = "t2",icon = icon("dashboard")),
       menuItem("Settings",  tabName = "t2",icon = icon("dashboard"))
     ),
+    radioButtons("diet", "Choose Diet",c("HF"="HF","Chow"="Chow")),
     textInput("origin_gene","origin_gene, Official NBCI gene symbol",value = "Adipoq"),
     selectInput(
       "origin_tissue",
@@ -310,8 +311,14 @@ ui<-dashboardPage(header(), sidebar(), body())
 server <- function(input, output, session) {
   working_dataset<-eventReactive(input$import,{
     
-    working_dataset<-mouse
-    working_dataset
+    isolate({
+      if(input$diet == "HF"){
+        working_dataset<-HF
+      }else{
+        working_dataset<-Chow
+      }
+      working_dataset
+    })
   })
   
   
