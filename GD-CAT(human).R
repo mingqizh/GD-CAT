@@ -49,7 +49,6 @@ sidebar <- function(){
       menuItem("Instruction",  tabName = "t2",icon = icon("dashboard")),
       menuItem("Settings",  tabName = "t2",icon = icon("dashboard"))
     ),
-    radioButtons(inputId = "specie",label = "Choose a specie",choices = c("Human","Mouse(coming soon)")),
     radioButtons("Gender", "Choose Sex",c("Both"="both","Male"="male", "Female"="female")),
     textInput("origin_gene","origin_gene, Official NBCI gene symbol",value = "ADIPOQ"),
     selectInput(
@@ -85,7 +84,7 @@ t2<-function(){
           fluidPage(
             tabBox(
               title = "Pie Chart",
-              width = 12,
+              width = 12,height="500px",
               tabPanel('All genes q<0.1', echarts4rOutput('plot.p1')),
               tabPanel('All genes q<0.01', echarts4rOutput('plot.p2')),
               tabPanel('All genes q<0.001', echarts4rOutput('plot.p3')),
@@ -101,7 +100,7 @@ t2<-function(){
               actionButton('btn', class = "btn-primary", 'Start Analysis'),
               uiOutput('plots.en')
             ),
-            tabBox(title="Age and sex of the cohort",width=12,height="500px",
+            tabBox(title="Correlation with age or sex difference",width=12,height="600px",
                    tabPanel('Age and sex of the cohort',plotOutput('AS'),
                             downloadButton("ASP", "Download Image"))
             ),
@@ -151,7 +150,7 @@ t2<-function(){
               title = "Network Analysis",
               width = 12,
               actionButton('btn1', class = "btn-primary", 'Start Analysis'),
-              tabPanel('Chart',plotOutput('net')),
+              tabPanel('Chart',plotOutput('net', width  = "1200px",height = "900px")),
               downloadButton("PDFPlot", "Download PDF"),
               downloadButton("netgene", "Download gene lists")
             )
@@ -624,7 +623,7 @@ server <- function(input, output, session) {
       tryCatch({
       colnames(scat_df) = c('sgene_1', 'sgene2')
       cc1 = bicorAndPvalue(scat_df$sgene2, scat_df$sgene_1)
-      sc<-ggplot(scat_df, aes(x=sgene_1, y=sgene2)) + theme_classic() +  geom_hex(bins = 100) + scale_fill_distiller(palette = "Blues", direction=-1)+ geom_smooth(method = 'lm', color = "darkorange")+  ggtitle(paste0(origin_gene_tissue, ' ~ ', select_gene2, ' r=', round(cc1$bicor, 3), ' p=', signif(cc1$p, 3))) + xlab(paste0('Normalized ', origin_gene_tissue, ' expression')) + ylab(paste0('Normalized ', select_gene2, ' expression')) 
+      sc<-ggplot(scat_df, aes(x=sgene_1, y=sgene2)) + theme_classic() +  geom_hex(bins = 100) + scale_fill_distiller(palette = "Blues", direction=-1)+ geom_smooth(method = 'lm', color = "darkorange")+  ggtitle(paste0(origin_gene_tissue, ' ~ ', select_gene2, ' r=', round(cc1$bicor, 3), ' p=', signif(cc1$p, 3))) + xlab(paste0('Normalized ', origin_gene_tissue, ' expression')) + ylab(paste0('Normalized ', select_gene2, ' expression')) + theme(aspect.ratio=1)
       output$sc<-renderPlot({
         sc
       }
@@ -797,7 +796,7 @@ server <- function(input, output, session) {
       },
       content = function(file) {
         pdf(file)
-        plot(net())
+        plot(qgraph(map2, minimum = 0.5, cut = 0.85, vsize = 3, color=cols_set$cols, legend = F, borders = TRUE, layout='spring', posCol = "dodgerblue3", negCol = "firebrick3", label.cex=4, directed=F, labels = colnames(map2)) )
         dev.off()
       }
     )
@@ -1024,3 +1023,4 @@ server <- function(input, output, session) {
 
 #run the app
 shinyApp(ui, server)
+

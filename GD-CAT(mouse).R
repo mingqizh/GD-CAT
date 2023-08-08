@@ -229,15 +229,32 @@ sidebar <- function(){
     ),
     radioButtons("diet", "Choose Diet",c("HF"="HF","Chow"="Chow")),
     textInput("origin_gene","origin_gene, Official NBCI gene symbol",value = "Adipoq"),
-    selectInput(
-      "origin_tissue",
+    conditionalPanel(
+     condition = "input.diet=='HF'",
+      selectInput(
+        "origin_tissue",
       "Select a tissue",
-      c(Adipose="adipose",
+     c(Adipose="adipose",
         Aorta = "aorta", 
+         Hypothlamus = "hypothlamus", 
+       Heart = "heart",
+        Liver = "liver",
+         Intestine="intestine",
+         Muscle="muscle")
+     )
+     ),
+     conditionalPanel(
+       condition = "input.diet=='Chow'",
+       selectInput(
+       "origin_tissue",
+       "Select a tissue",
+       c(Adipose="adipose",
+         Aorta = "aorta", 
         Bone = "bone", 
-        Heart = "heart",
-        Liver = "liver")
-    ),
+         Heart = "heart",
+         Liver = "liver")
+     )
+     ),
     actionButton('import', class = "btn-primary", 'Process data')
   )
 }
@@ -245,11 +262,6 @@ sidebar <- function(){
 t2<-function(){
   tabItem(tabName="t2",
           fluidPage(
-            sliderInput(inputId = "topn",label = "How many top-ranked correlated genes do you want to see?",value = 30, min = 1, max = 50),
-            tabBox(title="Top-N",width=12,height="500px",
-                   tabPanel('Top-ranked genes',echarts4rOutput('plot.top1')),
-                   tabPanel('Top-ranked genes without origin tissue',echarts4rOutput('plot.top2'))
-            ),
             tabBox(
               title = "Pie Chart",
               width = 12,
@@ -261,6 +273,12 @@ t2<-function(){
               tabPanel('Origin-removed q<0.001', echarts4rOutput('plot.p6')),
               tabPanel('Table-1',DTOutput('table.t1'))
             ),
+            sliderInput(inputId = "topn",label = "How many top-ranked correlated genes do you want to see?",value = 30, min = 1, max = 50),
+            tabBox(title="Top-N",width=12,height="500px",
+                   tabPanel('Top-ranked genes',echarts4rOutput('plot.top1')),
+                   tabPanel('Top-ranked genes without origin tissue',echarts4rOutput('plot.top2'))
+            ),
+            
             shinydashboard::box(
               title = "Enrichement Analysis",
               width = 12,
@@ -278,7 +296,7 @@ t2<-function(){
               title = "Trait correlations",
               width = 12,
               actionButton('Mbtn1', class = "btn-primary", 'Start Analysis'),
-              tabPanel('Correlations',plotOutput('trait_c')),
+              tabPanel('Correlations',plotOutput('trait_c', width  = "800px",height = "1000px")),
               downloadButton("trait_b", "Download PDF")
             ),
             sliderInput(inputId = "within",label = "How many within tissue gene numbers you want to input in the network",value = 30, min = 1, max = 50),
@@ -287,7 +305,7 @@ t2<-function(){
               title = "Network Analysis",
               width = 12,
               actionButton('btn1', class = "btn-primary", 'Start Analysis'),
-              tabPanel('Chart',plotOutput('net')),
+              tabPanel('Chart',plotOutput('net', width  = "1200px",height = "900px")),
               downloadButton("PDFPlot", "Download PDF"),
               downloadButton("netgene", "Download gene lists")
             )
@@ -687,7 +705,7 @@ server <- function(input, output, session) {
       },
       content = function(file) {
         pdf(file)
-        plot(net())
+        plot(qgraph(map2, minimum = 0.5, cut = 0.85, vsize = 3, color=cols_set$cols, legend = F, borders = TRUE, layout='spring', posCol = "dodgerblue3", negCol = "firebrick3", label.cex=4, directed=F, labels = colnames(map2)) )
         dev.off()
       }
     )
