@@ -273,6 +273,16 @@ t2<-function(){
               tabPanel('Origin-removed q<0.001', echarts4rOutput('plot.p6')),
               tabPanel('Table-1',DTOutput('table.t1'))
             ),
+            shinydashboard::box(
+              title = "Top GSEA-GO Activated and Suppressed",
+              width = 12,
+              sliderInput(inputId = "tp",label = "How many top pathways you want to see",value = 15, min = 1, max = 20),
+              actionButton('dotb', class = "btn-primary", 'Start process'),
+              plotOutput('dot',width  = "1200px",height = "900px"),
+              downloadButton("dotp", "Download Image"),
+              plotOutput('nete',width  = "1200px",height = "900px"),
+              downloadButton("ed", "Download Image")
+            ),
             sliderInput(inputId = "topn",label = "How many top-ranked correlated genes do you want to see?",value = 30, min = 1, max = 50),
             tabBox(title="Top-N",width=12,height="500px",
                    tabPanel('Top-ranked genes',echarts4rOutput('plot.top1')),
@@ -770,7 +780,105 @@ server <- function(input, output, session) {
                    buttons = c('copy','csv','excel'),
                    lengthMenu = list(c(10,25,50),
                                      c(10,25,50,"All")) ))
-  
+  observeEvent(input$dotb,{
+    if(!is.null(input$selected_tissue)){
+      progress <- Progress$new(session, min=0, max=5)
+      on.exit(progress$close())
+      progress$set(message = 'Processing the object for pathways',
+                   detail = 'It will take around 2-5 minutes depending on usage')
+      progress$set(value = 1)
+      isolate({
+        sig_table<-sig_table()
+        select_tissue = input$selected_tissue
+        pie_bin = as.numeric(input$tp)
+      })
+      binned_sig_prots= sig_table %>%
+        dplyr::group_by(qcat, tissue_2) %>%
+        dplyr::summarise(n = n()) %>%
+        dplyr::mutate(freq = n / sum(n))
+      
+      tissue_freqs = binned_sig_prots %>% dplyr::group_by(qcat) %>% dplyr::summarise(sum(n))
+      
+      binned_sig_prots$tot_count = tissue_freqs$`sum(n)`[match(binned_sig_prots$qcat, tissue_freqs$qcat)]
+      binned_sig_prots$qcat1 = paste0(binned_sig_prots$qcat, ' ', binned_sig_prots$tot_count, ' genes')
+      progress$set(value = 2)
+      tissue_table = binned_sig_prots[binned_sig_prots$qcat =='q<0.1',]
+      
+      
+      pp1 = sig_table[sig_table$tissue_2 %in% select_tissue,]
+      pp1 = pp1[pp1$pvalue < pie_bin,]
+      head(pp1)
+      fc_dko = scales::rescale(pp1$bicor, to=c(-3, 3))
+      progress$set(value = 3)
+      ## match each fold change value with the corresponding gene symbol
+      names(fc_dko) <- pp1$gene_symbol_2
+      #Next we need to order the fold changes in decreasing order. To do this we'll use the sort() function, which takes a vector as input. This is in contrast to Tidyverse's arrange(), which requires a data frame.
+      
+      ## Sort fold changes in decreasing order
+      fc_dko <- sort(fc_dko, decreasing = TRUE)
+      
+      organism = "org.Hs.eg.db"
+      
+      ## Org.Hs.eg.db https://bioconductor.org/packages/release/data/annotation/html/org.Hs.eg.db.html
+      
+      progress$set(value = 4)
+      
+      
+      gse <-gseGO(
+        geneList=fc_dko,
+        ont = "ALL",
+        OrgDb= organism,
+        keyType = "SYMBOL",
+        exponent = 1,
+        minGSSize = 2,
+        maxGSSize = 500,
+        eps = 0,
+        pvalueCutoff = 0.5,
+        pAdjustMethod = "BH") 
+      str(gse)
+      isolate({
+        origin_gene<-input$origin_gene
+        origin_tissue=input$origin_tissue
+        origin_gene_tissue = paste0(origin_gene, '_', origin_tissue)
+        number<-as.numeric(input$tp)
+      })
+      output$dot<-renderPlot({
+        
+        
+        dotplot(gse, showCategory=number, split=".sign") + facet_grid(.~.sign) +
+          ggtitle(paste0('GSEA pathways from positive and negative correlations ',  origin_gene_tissue, ' in ', input$selected_tissue))
+      })
+      output$dotp <- downloadHandler(
+        filename = function() {
+          paste("Pathway-", Sys.Date(), ".pdf", sep="")
+        },
+        content = function(file) {
+          pdf(file)
+          plot(dotplot(gse, showCategory=10, split=".sign") + facet_grid(.~.sign) +
+                 ggtitle(paste0('GSEA pathways from positive and negative correlations ',  origin_gene_tissue, ' in ', select_tissue))
+          )
+          dev.off()
+        }
+      )
+      x2<- pairwise_termsim(gse)
+      output$nete<-renderPlot({
+        emapplot(x2, showCategory = 20)+ ggtitle("Relationship between the top 20 most significantly GSE - GO terms (padj.)")
+      })
+      output$ed <- downloadHandler(
+        filename = function() {
+          paste("Pathway-", Sys.Date(), ".pdf", sep="")
+        },
+        content = function(file) {
+          pdf(file)
+          plot(emapplot(x2, showCategory = 20)+ ggtitle("Relationship between the top 20 most significantly GSE - GO terms (padj.)")
+          )
+          dev.off()
+        }
+      )
+    }else {
+      shinyalert("Warning!", "Please first click the Pie chart body to selected an tissue.", type = "warning")
+    }
+  })
   
   # click
   output$text <- renderText({
