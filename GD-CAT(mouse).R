@@ -280,6 +280,13 @@ t2<-function(){
               tabPanel('Table-1',DTOutput('table.t1'))
             ),
             shinydashboard::box(
+              title = "Please click the pie chart body above to start the pathway section",
+              width = 12,
+              verbatimTextOutput('text')
+              #actionButton('btn', class = "btn-primary", 'Start Analysis'),
+              #uiOutput('plots.en')
+            ),
+            shinydashboard::box(
               title = "Top GSEA-GO Activated and Suppressed",
               width = 12,
               sliderInput(inputId = "tp",label = "How many top pathways you want to see",value = 15, min = 1, max = 20),
@@ -295,13 +302,7 @@ t2<-function(){
                    tabPanel('Top-ranked genes without origin tissue',echarts4rOutput('plot.top2'))
             ),
             
-            shinydashboard::box(
-              title = "Enrichement Analysis",
-              width = 12,
-              verbatimTextOutput('text'),
-              actionButton('btn', class = "btn-primary", 'Start Analysis'),
-              uiOutput('plots.en')
-            ),
+            
             tabBox(
               title = "Clinic trait",
               width = 12,
