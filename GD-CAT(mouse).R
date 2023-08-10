@@ -842,7 +842,9 @@ server <- function(input, output, session) {
         eps = 0,
         pvalueCutoff = 0.5,
         pAdjustMethod = "BH") 
+      progress$set(value = 5)
       str(gse)
+      
       isolate({
         origin_gene<-input$origin_gene
         origin_tissue=input$origin_tissue
@@ -855,6 +857,7 @@ server <- function(input, output, session) {
         dotplot(gse, showCategory=number, split=".sign") + facet_grid(.~.sign) +
           ggtitle(paste0('GSEA pathways from positive and negative correlations ',  origin_gene_tissue, ' in ', input$selected_tissue))
       })
+      progress$set(value = 6)
       output$dotp <- downloadHandler(
         filename = function() {
           paste("Pathway-", Sys.Date(), ".pdf", sep="")
@@ -871,6 +874,7 @@ server <- function(input, output, session) {
       output$nete<-renderPlot({
         emapplot(x2, showCategory = 20)+ ggtitle("Relationship between the top 20 most significantly GSE - GO terms (padj.)")
       })
+      progress$set(value = 7)
       output$ed <- downloadHandler(
         filename = function() {
           paste("Pathway-", Sys.Date(), ".pdf", sep="")

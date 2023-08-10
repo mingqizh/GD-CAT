@@ -99,6 +99,13 @@ t2<-function(){
               tabPanel('Table-1',DTOutput('table.t1'))
             ),
             shinydashboard::box(
+              title = "Please click the pie chart body above to start the pathway section",
+              width = 12,
+              verbatimTextOutput('text'),
+              #actionButton('btn', class = "btn-primary", 'Start Analysis'),
+              #uiOutput('plots.en')
+            ),
+            shinydashboard::box(
               title = "Top GSEA-GO Activated and Suppressed",
               width = 12,
               sliderInput(inputId = "tp",label = "How many top pathways you want to see",value = 15, min = 1, max = 20),
@@ -108,13 +115,7 @@ t2<-function(){
               plotOutput('nete',width  = "1200px",height = "900px"),
               downloadButton("ed", "Download Image")
             ),
-            shinydashboard::box(
-              title = "Enrichement Analysis",
-              width = 12,
-              verbatimTextOutput('text'),
-              actionButton('btn', class = "btn-primary", 'Start Analysis'),
-              uiOutput('plots.en')
-            ),
+            
             tabBox(title="Correlation with age or sex difference",width=12,height="600px",
                    tabPanel('Age and sex of the cohort',plotOutput('AS'),
                             downloadButton("ASP", "Download Image"))
@@ -932,6 +933,7 @@ server <- function(input, output, session) {
       eps = 0,
       pvalueCutoff = 0.5,
       pAdjustMethod = "BH") 
+    progress$set(value = 5)
     str(gse)
      isolate({
         origin_gene<-input$origin_gene
@@ -939,12 +941,14 @@ server <- function(input, output, session) {
         origin_gene_tissue = paste0(origin_gene, '_', origin_tissue)
         number<-as.numeric(input$tp)
       })
+     
     output$dot<-renderPlot({
       
       
       dotplot(gse, showCategory=number, split=".sign") + facet_grid(.~.sign) +
         ggtitle(paste0('GSEA pathways from positive and negative correlations ',  origin_gene_tissue, ' in ', input$selected_tissue))
     })
+    progress$set(value = 6)
     output$dotp <- downloadHandler(
       filename = function() {
         paste("Pathway-", Sys.Date(), ".pdf", sep="")
@@ -961,6 +965,7 @@ server <- function(input, output, session) {
     output$nete<-renderPlot({
       emapplot(x2, showCategory = 20)+ ggtitle("Relationship between the top 20 most significantly GSE - GO terms (padj.)")
     })
+    progress$set(value = 7)
     output$ed <- downloadHandler(
       filename = function() {
         paste("Pathway-", Sys.Date(), ".pdf", sep="")
