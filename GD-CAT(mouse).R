@@ -30,6 +30,12 @@ library(tibble)
 library(gridExtra)
 library(ggpubr)
 library(writexl)
+library(org.Mm.eg.db)
+library(clusterProfiler)
+library(enrichplot)
+library("pathview")
+library(cowplot)
+library(europepmc)
 allowWGCNAThreads()
 ## load data
 load("mouse.RData")
@@ -817,7 +823,7 @@ server <- function(input, output, session) {
       ## Sort fold changes in decreasing order
       fc_dko <- sort(fc_dko, decreasing = TRUE)
       
-      organism = "org.Hs.eg.db"
+      organism = "org.Mm.eg.db"
       
       ## Org.Hs.eg.db https://bioconductor.org/packages/release/data/annotation/html/org.Hs.eg.db.html
       
