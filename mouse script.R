@@ -6,11 +6,11 @@ library(WGCNA)
 library(ggpubr)
 library(reshape2)
 allowWGCNAThreads()
-load('Chow HMDP app env.RData')
+load('mouse.RData')
 
 ######################################
 #Mingqi These scripts are just reproducing the adipoQ file that you have so ignore as these will be SQL pulls
-working_dataset<-Chow
+working_dataset<-HF
 tissue2 <- working_dataset
 
 tissue1 <- working_dataset[, colnames(working_dataset) == 'Adipoq_adipose']
@@ -165,6 +165,63 @@ plotEnrich(enriched[[3]], showTerms = 4, numChar = 45, y = "Count", orderBy = "P
 
 
 #Also insert other rank-based pathways
+library(enrichR)
+#Note this will be library(org.Mm.eg.db) for mouse
+library(org.Hs.eg.db)
+library("pathview")
+library(clusterProfiler)
+library(enrichplot)
+library(cowplot)
+binned_sig_prots= sig_table %>%
+  dplyr::group_by(qcat, tissue_2) %>%
+  dplyr::summarise(n = n()) %>%
+  dplyr::mutate(freq = n / sum(n))
+
+tissue_freqs = binned_sig_prots %>% dplyr::group_by(qcat) %>% dplyr::summarise(sum(n))
+
+binned_sig_prots$tot_count = tissue_freqs$`sum(n)`[match(binned_sig_prots$qcat, tissue_freqs$qcat)]
+binned_sig_prots$qcat1 = paste0(binned_sig_prots$qcat, ' ', binned_sig_prots$tot_count, ' genes')
+
+tissue_table = binned_sig_prots[binned_sig_prots$qcat =='q<0.1',]
+select_tissue = tissue_table$tissue_2[1]
+pie_bin = 0.1
+pp1 = sig_table[sig_table$tissue_2 %in% select_tissue,]
+pp1 = pp1[pp1$pvalue < pie_bin,]
+head(pp1)
+fc_dko = scales::rescale(pp1$bicor, to=c(-3, 3))
+
+## match each fold change value with the corresponding gene symbol
+names(fc_dko) <- pp1$gene_symbol_2
+#Next we need to order the fold changes in decreasing order. To do this we'll use the sort() function, which takes a vector as input. This is in contrast to Tidyverse's arrange(), which requires a data frame.
+
+## Sort fold changes in decreasing order
+fc_dko <- sort(fc_dko, decreasing = TRUE)
+
+organism = "org.Hs.eg.db"
+## Org.Hs.eg.db https://bioconductor.org/packages/release/data/annotation/html/org.Hs.eg.db.html
+gse <-gseGO(
+  geneList=fc_dko,
+  ont = "ALL",
+  OrgDb= organism,
+  keyType = "SYMBOL",
+  exponent = 1,
+  minGSSize = 2,
+  maxGSSize = 500,
+  eps = 0,
+  pvalueCutoff = 0.5,
+  pAdjustMethod = "BH") 
+str(gse)
+
+## gsego https://www.rdocumentation.org/packages/clusterProfiler/versions/3.0.4/topics/gseGO
+dotplot(gse, showCategory=10, split=".sign") + facet_grid(.~.sign) +
+  ggtitle(paste0('GSEA pathways from positive and negative correlations ',  origin_gene_tissue, ' in ', select_tissue))
+
+gse@result$Description[1:20]
+##emapplot pathway networks
+
+x2 <- pairwise_termsim(gse)
+emapplot(x2, showCategory = 20)+ ggtitle("Relationship between the top 20 most significantly GSE - GO terms (padj.)")
+goplot(gse)
 
 
 
@@ -261,3 +318,5 @@ qgraph(map2, minimum = 0.4, cut = 0.9, vsize = 3, color=cols_set$cols, labels=gs
 qgraph(map2, minimum = 0.3, cut = 0.8, vsize = 3, color=cols_set$cols, legend = F, borders = TRUE, layout='spring', posCol = "dodgerblue3", negCol = "firebrick3",  directed=F, labels = F) + ggtitle(paste0('Undirected network for ', origin_gene_tissue, ' without labels')) 
 
 dev.off()
+
+
