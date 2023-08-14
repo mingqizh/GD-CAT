@@ -36,6 +36,7 @@ library(enrichplot)
 library("pathview")
 library(cowplot)
 library(europepmc)
+library(fresh)
 allowWGCNAThreads()
 ## load data
 load("mouse.RData")
@@ -233,6 +234,7 @@ sidebar <- function(){
       menuItem("Instruction",  tabName = "t2",icon = icon("dashboard")),
       menuItem("Settings",  tabName = "t2",icon = icon("dashboard"))
     ),
+    p("This is for mouse data."),
     radioButtons("diet", "Choose Diet",c("HF"="HF","Chow"="Chow")),
     textInput("origin_gene","origin_gene, Official NBCI gene symbol",value = "Adipoq"),
     conditionalPanel(
@@ -339,7 +341,7 @@ body <- function(){
 }
 
 #combine as UI
-ui<-dashboardPage(header(), sidebar(), body())
+ui<-dashboardPage(skin="green",header(), sidebar(), body())
 
 
 # setting the server
