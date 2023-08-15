@@ -907,7 +907,8 @@ server <- function(input, output, session) {
     pp1 = sig_table[sig_table$tissue_2 %in% select_tissue,]
     pp1 = pp1[pp1$pvalue < pie_bin,]
     head(pp1)
-    fc_dko = scales::rescale(pp1$bicor, to=c(-3, 3))
+    #fc_dko = scales::rescale(pp1$bicor, to=c(-3, 3))
+    fc_dko = pp1$bicor
     progress$set(value = 3)
     ## match each fold change value with the corresponding gene symbol
     names(fc_dko) <- pp1$gene_symbol_2
