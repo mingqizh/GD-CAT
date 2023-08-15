@@ -824,7 +824,8 @@ server <- function(input, output, session) {
       #Next we need to order the fold changes in decreasing order. To do this we'll use the sort() function, which takes a vector as input. This is in contrast to Tidyverse's arrange(), which requires a data frame.
       
       ## Sort fold changes in decreasing order
-      fc_dko <- sort(fc_dko, decreasing = TRUE)
+      #fc_dko <- sort(fc_dko, decreasing = TRUE)
+      fc_dko = pp1$bicor
       
       organism = "org.Mm.eg.db"
       
