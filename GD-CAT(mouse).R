@@ -843,7 +843,7 @@ server <- function(input, output, session) {
         minGSSize = 2,
         maxGSSize = 500,
         eps = 0,
-        pvalueCutoff = 0.5,
+        pvalueCutoff = 1,
         pAdjustMethod = "BH") 
       progress$set(value = 5)
       str(gse)
@@ -857,7 +857,7 @@ server <- function(input, output, session) {
       output$dot<-renderPlot({
         
         
-        dotplot(gse, showCategory=number, split=".sign") + facet_grid(.~.sign) +
+        dotplot(gse, showCategory=number, split=".sign", color = "pvalue") + facet_grid(.~.sign) +
           ggtitle(paste0('GSEA pathways from positive and negative correlations ',  origin_gene_tissue, ' in ', input$selected_tissue))
       })
       progress$set(value = 6)
@@ -867,7 +867,7 @@ server <- function(input, output, session) {
         },
         content = function(file) {
           pdf(file)
-          plot(dotplot(gse, showCategory=10, split=".sign") + facet_grid(.~.sign) +
+          plot(dotplot(gse, showCategory=10, split=".sign", color = "pvalue") + facet_grid(.~.sign) +
                  ggtitle(paste0('GSEA pathways from positive and negative correlations ',  origin_gene_tissue, ' in ', select_tissue))
           )
           dev.off()
@@ -875,7 +875,7 @@ server <- function(input, output, session) {
       )
       x2<- pairwise_termsim(gse)
       output$nete<-renderPlot({
-        emapplot(x2, showCategory = 20)+ ggtitle("Relationship between the top 20 most significantly GSE - GO terms (padj.)")
+        emapplot(x2, showCategory = 20, color = "pvalue")+ ggtitle("Relationship between the top 20 most significantly GSE - GO terms (padj.)")
       })
       progress$set(value = 7)
       output$ed <- downloadHandler(
@@ -884,7 +884,7 @@ server <- function(input, output, session) {
         },
         content = function(file) {
           pdf(file)
-          plot(emapplot(x2, showCategory = 20)+ ggtitle("Relationship between the top 20 most significantly GSE - GO terms (padj.)")
+          plot(emapplot(x2, showCategory = 20, color = "pvalue")+ ggtitle("Relationship between the top 20 most significantly GSE - GO terms (padj.)")
           )
           dev.off()
         }
