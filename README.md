@@ -19,7 +19,7 @@ Hit the "process data" button after choosing a tissue. A progress bar will show 
 After the processing of the original data, you can see the pie chart where the gene is enriched in, age and sex of the cohort, cell type, and top genes. <br><br>
 ![pie](https://github.com/mingqizh/GD-CAT/blob/main/images/sfd.png)<br><br>
 ### Enrichment Analysis
-To generate the pathway analysis of the second part, users should click the pie chart body to select a tissue and threshold first. Your choice will be displayed then in this section. Then users can hit the "Start Analysis" button to see the results. <br><br>
+To generate the pathway analysis of the second part, users should click the pie chart body to select a tissue and threshold first. Your choice will be displayed then in this section. Then users can hit the "Start Analysis" button to see the results. After clicking the button, a progress bar will appear at the bottom right. <br><br>
 ![enrichment](https://github.com/mingqizh/GD-CAT/blob/main/images/enrich.png)<br><br>
 ### Scatter Plot
 Same as the initial settings, make sure you put an official NBCI gene symbol here. <br><br>
