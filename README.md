@@ -8,10 +8,10 @@ Portal for mouse data is coming soon. <br><br>
 Now the [paper](https://pubmed.ncbi.nlm.nih.gov/37214953/) is preprint.<br><br>
 ## Tutorial 
 ### Initial settings
-First start from the dashboard. Select the sex that you want and input an NBCI gene symbol, or you will see a pop-up warning. <br><br>
+First start from the dashboard. Select the sex that you want and input an [NBCI gene symbol](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7494048/), or you will see a pop-up warning. <br><br>
 
 > [!IMPORTANT]
-> For the human gene symbol, you should input an **all in upper-case** gene symbol (e.g., `ADIPOQ`); while for the mouse data, you only need capital the **FIRST** letter, like `Adipoq`. [Reference](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7494048/)<br><br>
+> For the human gene symbol, you should input an **all in upper-case** gene symbol (e.g., `ADIPOQ`); while for the mouse data, you only need capital the **FIRST** letter, like `Adipoq`. <br><br>
 
 ![initial](https://github.com/mingqizh/GD-CAT/blob/main/images/hset.png)<br><br>
 Hit the "process data" button after choosing a tissue. A progress bar will show at the bottom right of the screen. <br><br>
