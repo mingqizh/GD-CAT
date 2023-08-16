@@ -24,9 +24,11 @@ Same as the initial settings, make sure you put an official NBCI gene symbol her
 Move the slider bars to custom the gene numbers for within and peripheral tissue and then process the analysis. <br><br>
 ![net](https://github.com/mingqizh/GD-CAT/blob/main/images/net.png)
 > [!NOTE]
-> For mouse data is pretty much the same pipeline to use, just a few different. And be awarded that the color of the headboard for the mouse is green and the human one will be blue. <br><be>
+> For mouse data is pretty much the same pipeline to use, just a few different. And be awarded that the color of the headboard for the mouse is green and the human one will be blue. 
+
 > [!NOTE]
-> All the images plus some of the data that generate them can be downloaded. The interactive images download buttons are on the top right and for other plots are from the bottom left. <br><be>
+> All the images plus some of the data that generate them can be downloaded. The interactive images download buttons are on the top right and for other plots are from the bottom left. 
+
 > [!IMPORTANT]
 > You should hit the button again to update your settings. 
 
