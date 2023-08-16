@@ -393,7 +393,7 @@ server <- function(input, output, session) {
     tryCatch({
       full_cors = bicorAndPvalue(tissue1, tissue2, use = 'p')
     }, error = function(e) {
-      shinyalert("Oops!","Plese input a official NBCI gene symbol.", type = "error")
+      shinyalert("Oops!","Please check that you input the official NBCI gene symbol; another reason may be that no such gene is available in the dataset.", type = "error")
     })
     
     progress$set(value = 3)
