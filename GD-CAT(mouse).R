@@ -567,10 +567,24 @@ server <- function(input, output, session) {
     })
     output$trait_b <- downloadHandler(
       filename = function() {
-        "Correlation.png"
+        paste("Correlation-", Sys.Date(), ".pdf", sep="")
       },
       content = function(file) {
-        ggsave(file, plot = trait_c(), device = "png", width = 9, height = 6)
+        pdf(file)
+        plot(ggdotchart(cc1, x = "trait_name", y = "logp",
+                        color = "direction",                                # Color by groups
+                        palette = c(  "#FC4E07", "#00AFBB"), # Custom color palette
+                        sorting = "descending",                       # Sort value in descending order
+                        add = "segments",                             # Add segments from y = 0 to dots
+                        rotate = TRUE,                                # Rotate vertically
+                        group = "direction",                                # Order by groups
+                        dot.size = 6,                                 # Large dot size
+                        label = round(cc1$bicor, 2),                        # Add mpg values as dot labels
+                        font.label = list(color = "black", size = 9, 
+                                          vjust = 0.5),               # Adjust label parameters
+                        ggtheme = theme_pubr()                        # ggplot2 theme
+        ) + ylab('-log10(pvalue)') + xlab('') + ggtitle(paste0(origin_gene_tissue, ' ~ trait correlations')))
+        dev.off()
       }
     )
   })
