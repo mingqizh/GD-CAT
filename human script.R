@@ -5,10 +5,10 @@ library(stats)
 library(WGCNA)
 library(reshape2)
 allowWGCNAThreads()
-setwd('G:/My Drive/lab files/endocrine signaling app')
-load('G:/My Drive/lab files/sex-difference myokine study/GTEx NA included env.RData')
+setwd('C:/Users/zming/Desktop/GTEx')
+load('working_dataset.RData')
 GTEx_full=NULL
-working_dataset=female
+working_dataset=both
 row.names(working_dataset) = working_dataset$gene_tissue
 working_dataset$gene_tissue=NULL
 working_dataset = as.data.frame(t(working_dataset))
@@ -21,7 +21,7 @@ GTEx_subfiltered=NULL
 tissue2 <- working_dataset[,grepl('Adipose - Subcutaneous', colnames(working_dataset)) | grepl('Adipose - Visceral (Omentum)', colnames(working_dataset), fixed=T) | grepl('Brain - Hypothalamus', colnames(working_dataset)) | grepl('Brain - Hippocampus', colnames(working_dataset))  | grepl('Small Intestine - Terminal Ileum', colnames(working_dataset), fixed=T) | grepl('Stomach', colnames(working_dataset), fixed=T) | grepl('Thyroid', colnames(working_dataset), fixed=T) | grepl('Pancreas', colnames(working_dataset), fixed=T) | grepl('Spleen', colnames(working_dataset), fixed=T) | grepl('Muscle - Skeletal', colnames(working_dataset), fixed=T) | grepl('Pituitary', colnames(working_dataset), fixed=T) | grepl('Artery - Coronary', colnames(working_dataset), fixed=T) | grepl('Liver', colnames(working_dataset), fixed=T) | grepl('Kidney - Cortex', colnames(working_dataset), fixed=T) | grepl('Heart - Left Ventricle', colnames(working_dataset), fixed=T) | grepl('Colon - Transverse', colnames(working_dataset), fixed=T) | grepl('Colon - Sigmoid', colnames(working_dataset), fixed=T) | grepl('Adrenal Gland', colnames(working_dataset), fixed=T) |  grepl('Artery - Aorta', colnames(working_dataset), fixed=T),]
 
 
-tissue1 <- working_dataset[, colnames(working_dataset) == 'ARNTL_Colon - Transverse']
+tissue1 <- working_dataset[, colnames(working_dataset) == 'GCG_Small Intestine - Terminal Ileum']
 
 
 #tissue1 = tissue1[row.names(tissue1) %in% row.names(tissue2),]
@@ -62,8 +62,8 @@ library(forcats)
 library(enrichR)
 library(MetBrewer)
 #here I set the origin gene_tissue manually, but the user will enter 
-origin_gene = 'ARNTL'
-origin_tissue = 'Colon - Transverse'
+origin_gene = 'GCG'
+origin_tissue = 'Small Intestine - Terminal Ileum'
 origin_gene_tissue = paste0(origin_gene, '_', origin_tissue)
 
 sig_table = sql_pull_1[sql_pull_1$qvalue<0.1,]
@@ -188,7 +188,7 @@ ggplot(binned_sig_prots, aes(x = "", y = freq, fill =tissue_2)) +
 #run the pathways corresponding to each tissue.  I revised these to bin separately by negatively vs positively correlated which I think will be important for the user
 
 #I set the tissue manually but here is where the user would select the tissue based on what you showed me in clicking the pie chart
-  select_tissue = 'Adipose - Subcutaneous'
+select_tissue = 'Pancreas'
 pie_bin = 0.1
 
 
@@ -201,13 +201,12 @@ library(enrichplot)
 library(cowplot)
 
 tissue_table = binned_sig_prots[binned_sig_prots$qcat =='q<0.1',]
-select_tissue = tissue_table$tissue_2[1]
 pie_bin = 0.1
 pp1 = sig_table[sig_table$tissue_2 %in% select_tissue,]
 pp1 = pp1[pp1$pvalue < pie_bin,]
 head(pp1)
-fc_dko = scales::rescale(pp1$bicor, to=c(-3, 3))
-
+#fc_dko = scales::rescale(pp1$bicor, to=c(-3, 3))
+fc_dko<-pp1$bicor
 ## match each fold change value with the corresponding gene symbol
 names(fc_dko) <- pp1$gene_symbol_2
 #Next we need to order the fold changes in decreasing order. To do this we'll use the sort() function, which takes a vector as input. This is in contrast to Tidyverse's arrange(), which requires a data frame.
@@ -226,18 +225,18 @@ gse <-gseGO(
   minGSSize = 2,
   maxGSSize = 500,
   eps = 0,
-  pvalueCutoff = 0.5,
+  pvalueCutoff = 1,
   pAdjustMethod = "BH") 
 str(gse)
 
 ## gsego https://www.rdocumentation.org/packages/clusterProfiler/versions/3.0.4/topics/gseGO
-dotplot(gse, showCategory=10, split=".sign") + facet_grid(.~.sign) +
+dotplot(gse, showCategory=10, split=".sign", color = "pvalue",) + facet_grid(.~.sign) +
   ggtitle(paste0('GSEA pathways from positive and negative correlations ',  origin_gene_tissue, ' in ', select_tissue))
 
 ##emapplot pathway networks
 
 x2 <- pairwise_termsim(gse)
-emapplot(x2, showCategory = 20)+ ggtitle("Relationship between the top 20 most significantly GSE - GO terms (padj.)")
+emapplot(x2, showCategory = 20, color = "pvalue")+ ggtitle("Relationship between the top 20 most significantly GSE - GO terms (padj.)")
 goplot(gse)
 
 
