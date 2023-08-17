@@ -563,8 +563,9 @@ server <- function(input, output, session) {
                  font.label = list(color = "black", size = 9, 
                                    vjust = 0.5),               # Adjust label parameters
                  ggtheme = theme_pubr()                        # ggplot2 theme
-      ) + ylab('-log10(pvalue)') + xlab('') + ggtitle(paste0(origin_gene_tissue, ' ~ trait correlations'))
+      ) + ylab('-log10(pvalue)') + xlab('') + ggtitle(paste0(origin_gene_tissue, ' ~ trait correlations',' ', input$diet))
     })
+
     output$trait_b <- downloadHandler(
       filename = function() {
         paste("Correlation-", Sys.Date(), ".pdf", sep="")
@@ -583,11 +584,15 @@ server <- function(input, output, session) {
                         font.label = list(color = "black", size = 9, 
                                           vjust = 0.5),               # Adjust label parameters
                         ggtheme = theme_pubr()                        # ggplot2 theme
-        ) + ylab('-log10(pvalue)') + xlab('') + ggtitle(paste0(origin_gene_tissue, ' ~ trait correlations')))
+        ) + ylab('-log10(pvalue)') + xlab('') + ggtitle(paste0(origin_gene_tissue, ' ~ trait correlations',' ', input$diet)))
         dev.off()
       }
     )
+    
   })
+  
+  
+  
   observeEvent(input$btn1,{
     progress <- Progress$new(session, min=0, max=5)
     on.exit(progress$close())
@@ -831,15 +836,15 @@ server <- function(input, output, session) {
       pp1 = sig_table[sig_table$tissue_2 %in% select_tissue,]
       pp1 = pp1[pp1$pvalue < pie_bin,]
       head(pp1)
-      fc_dko = scales::rescale(pp1$bicor, to=c(-3, 3))
+      #fc_dko = scales::rescale(pp1$bicor, to=c(-3, 3))
+      fc_dko = pp1$bicor
       progress$set(value = 3)
       ## match each fold change value with the corresponding gene symbol
       names(fc_dko) <- pp1$gene_symbol_2
       #Next we need to order the fold changes in decreasing order. To do this we'll use the sort() function, which takes a vector as input. This is in contrast to Tidyverse's arrange(), which requires a data frame.
       
       ## Sort fold changes in decreasing order
-      #fc_dko <- sort(fc_dko, decreasing = TRUE)
-      fc_dko = pp1$bicor
+      fc_dko <- sort(fc_dko, decreasing = TRUE)
       
       organism = "org.Mm.eg.db"
       
@@ -857,7 +862,7 @@ server <- function(input, output, session) {
         minGSSize = 2,
         maxGSSize = 500,
         eps = 0,
-        pvalueCutoff = 1,
+        pvalueCutoff = 0.5,
         pAdjustMethod = "BH") 
       progress$set(value = 5)
       str(gse)
@@ -871,8 +876,8 @@ server <- function(input, output, session) {
       output$dot<-renderPlot({
         
         
-        dotplot(gse, showCategory=number, split=".sign", color = "pvalue") + facet_grid(.~.sign) +
-          ggtitle(paste0('GSEA pathways from positive and negative correlations ',  origin_gene_tissue, ' in ', input$selected_tissue))
+        dotplot(gse, showCategory=number, split=".sign") + facet_grid(.~.sign) +
+          ggtitle(paste0('GSEA pathways from positive and negative correlations ',  origin_gene_tissue, ' in ', input$selected_tissue,' ',  input$diet))
       })
       progress$set(value = 6)
       output$dotp <- downloadHandler(
@@ -881,15 +886,15 @@ server <- function(input, output, session) {
         },
         content = function(file) {
           pdf(file)
-          plot(dotplot(gse, showCategory=10, split=".sign", color = "pvalue") + facet_grid(.~.sign) +
-                 ggtitle(paste0('GSEA pathways from positive and negative correlations ',  origin_gene_tissue, ' in ', select_tissue))
+          plot(dotplot(gse, showCategory=10, split=".sign") + facet_grid(.~.sign) +
+                 ggtitle(paste0('GSEA pathways from positive and negative correlations ',  origin_gene_tissue, ' in ', select_tissue, ' ', input$diet))
           )
           dev.off()
         }
       )
       x2<- pairwise_termsim(gse)
       output$nete<-renderPlot({
-        emapplot(x2, showCategory = 20, color = "pvalue")+ ggtitle("Relationship between the top 20 most significantly GSE - GO terms (padj.)")
+        emapplot(x2, showCategory = 20)+ ggtitle("Relationship between the top 20 most significantly GSE - GO terms (padj.)")
       })
       progress$set(value = 7)
       output$ed <- downloadHandler(
@@ -898,7 +903,7 @@ server <- function(input, output, session) {
         },
         content = function(file) {
           pdf(file)
-          plot(emapplot(x2, showCategory = 20, color = "pvalue")+ ggtitle("Relationship between the top 20 most significantly GSE - GO terms (padj.)")
+          plot(emapplot(x2, showCategory = 20)+ ggtitle("Relationship between the top 20 most significantly GSE - GO terms (padj.)")
           )
           dev.off()
         }
