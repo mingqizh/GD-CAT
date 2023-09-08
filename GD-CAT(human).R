@@ -544,7 +544,7 @@ server <- function(input, output, session) {
       e_legend(show=F) %>%
       e_add_nested("itemStyle", color) %>%
       e_grid(bottom="150px") %>%
-      e_x_axis(axisLabel = list(interval = 0, rotate = 20)) %>%
+      e_x_axis(axisLabel = list(interval = 0, rotate = 45)) %>%
       e_y_axis(name = "Bicor Values")%>%
       e_datazoom(type='inside') %>%
       e_tooltip(
@@ -570,7 +570,7 @@ server <- function(input, output, session) {
       e_legend(show=F) %>%
       e_add_nested("itemStyle", color) %>%
       e_grid(bottom="150px") %>%
-      e_x_axis(axisLabel = list(interval = 0, rotate = 20)) %>%
+      e_x_axis(axisLabel = list(interval = 0, rotate = 45)) %>%
       e_y_axis(name = "Bicor Values")%>%
       e_datazoom(type='inside') %>%
       e_tooltip(
@@ -607,7 +607,7 @@ server <- function(input, output, session) {
       e_legend(show=F) %>%
       e_add_nested("itemStyle", color) %>%
       e_grid(bottom="100px") %>%
-      e_x_axis(axisLabel = list(interval = 0, rotate = 20)) %>%
+      e_x_axis(axisLabel = list(interval = 0, rotate = 45)) %>%
       e_y_axis(name = "Bicor Values")%>%
       e_datazoom(type='inside') %>%
       e_tooltip(
@@ -965,7 +965,7 @@ server <- function(input, output, session) {
     )
     x2<- pairwise_termsim(gse)
     output$nete<-renderPlot({
-      emapplot(x2, showCategory=number, color = "pvalue")+ ggtitle("Relationship between the top 20 most significantly GSE - GO terms (padj.)")
+      emapplot(x2, showCategory=number, color = "pvalue")+ ggtitle("Relationship between the top most significantly GSE - GO terms (padj.)")
     })
     progress$set(value = 7)
     output$ed <- downloadHandler(
@@ -974,7 +974,7 @@ server <- function(input, output, session) {
       },
       content = function(file) {
         pdf(file)
-        plot(emapplot(x2, showCategory=number, color = "pvalue")+ ggtitle("Relationship between the top 20 most significantly GSE - GO terms (padj.)")
+        plot(emapplot(x2, showCategory=number, color = "pvalue")+ ggtitle("Relationship between the top most significantly GSE - GO terms (padj.)")
         )
         dev.off()
       }

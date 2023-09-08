@@ -456,7 +456,7 @@ server <- function(input, output, session) {
         e_legend(show=F) %>%
         e_add_nested("itemStyle", color) %>%
         e_grid(bottom="150px") %>%
-        e_x_axis(axisLabel = list(interval = 0, rotate = 20)) %>%
+        e_x_axis(axisLabel = list(interval = 0, rotate = 45)) %>%
         e_y_axis(name = "Bicor Values")%>%
         e_datazoom(type='inside') %>%
         e_tooltip(
@@ -490,7 +490,7 @@ server <- function(input, output, session) {
         e_legend(show=F) %>%
         e_add_nested("itemStyle", color) %>%
         e_grid(bottom="100px") %>%
-        e_x_axis(axisLabel = list(interval = 0, rotate = 20)) %>%
+        e_x_axis(axisLabel = list(interval = 0, rotate = 45)) %>%
         e_y_axis(name = "Bicor Values")%>%
         e_datazoom(type='inside') %>%
         e_tooltip(
