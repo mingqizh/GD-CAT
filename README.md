@@ -15,6 +15,8 @@ Hit the "process data" button after choosing a tissue. A progress bar will show 
 ![pre](https://github.com/mingqizh/GD-CAT/blob/main/images/1689177951994.png)<br><br>
 After the processing of the original data, you can see the pie chart where the gene is enriched in, age and sex of the cohort, cell type, and top genes. <br><br>
 ![pie](https://github.com/mingqizh/GD-CAT/blob/main/images/sfd.png)<br><br>
+Click the `table` tab you can explore more about the data you are using. You can filter, rank, search, copy, or download the data in 2 formats.<br><be>
+![table](https://github.com/mingqizh/GD-CAT/blob/main/images/table.png)<br><br>
 ### Enrichment Analysis
 To generate the pathway analysis of the second part, users should click the pie chart body to select a tissue and threshold first. Your choice will be displayed then in this section. Then users can hit the "Start Analysis" button to see the results. After clicking the button, a progress bar will appear at the bottom right. <br><br>
 ![enrichment](https://github.com/mingqizh/GD-CAT/blob/main/images/enrich.png)<br><br>
