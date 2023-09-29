@@ -5,7 +5,7 @@ You can select the gene and tissue combination that interests you, and have a lo
 and then do the enrichment, scatter plot, single cell and network visualization.  <br><br>
 You can access our app for human now via [GD-CAT](https://pipeline.biochem.uci.edu/gtex/demo2/).<br><br>
 Portal for mouse data is coming soon. <br><br>
-Now the [paper](https://pubmed.ncbi.nlm.nih.gov/37214953/) is preprint.<br><br>
+Now the [paper](https://elifesciences.org/reviewed-preprints/88863) is preprint.<br><br>
 ## Tutorial 
 ### Initial settings
 First start from the dashboard. Select the sex that you want and input an [NBCI gene symbol](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7494048/), or you will see a pop-up warning. <br><br>
