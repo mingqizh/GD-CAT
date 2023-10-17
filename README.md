@@ -20,7 +20,7 @@ First start from the dashboard. Select the sex that you want and input an [NBCI 
 ![initial](https://github.com/mingqizh/GD-CAT/blob/main/images/hset.png) <br><br>
 Hit the "process data" button after choosing a tissue. A progress bar will show at the bottom right of the screen. <br><br>
 ![pre](https://github.com/mingqizh/GD-CAT/blob/main/images/1689177951994.png) <br><br>
-After the processing of the original data, you can see the pie chart where the gene is enriched in, age and sex of the cohort, cell type, and top genes. <br><br>
+After the processing of the original data, you can see the pie chart where the gene is enriched in, age and sex of the cohort, cell type, and top genes. For the pie chart, it means how the gene you inputted from the selected tissue expressed across all tissue; and the `Remove original tissue` means how it looks like if the original tissue is removed. <br><br>
 ![pie](https://github.com/mingqizh/GD-CAT/blob/main/images/sfd.png) <br><br>
 Click the `table` tab you can explore more about the data you are using. You can filter, rank, search, copy, or download the data in 2 formats.<br><br>
 ![table](https://github.com/mingqizh/GD-CAT/blob/main/images/table.png)<br><br>
