@@ -71,9 +71,9 @@ t2<-function(){
               width = 12,
               sliderInput(inputId = "tp",label = "How many top pathways you want to see",value = 15, min = 1, max = 20),
               actionButton('dotb', class = "btn-primary", 'Start process'),
-              plotOutput('dot',width  = "1200px",height = "900px"),
+              plotOutput('dot',width  = "900px",height = "900px"),
               downloadButton("dotp", "Download Image"),
-              plotOutput('nete',width  = "1200px",height = "900px"),
+              plotOutput('nete',width  = "900px",height = "900px"),
               downloadButton("ed", "Download Image")
             ),
             sliderInput(inputId = "topn",label = "How many top-ranked correlated genes do you want to see?",value = 30, min = 1, max = 50),
@@ -124,6 +124,13 @@ ui<-dashboardPage(skin="green",header(), sidebar(), body())
 
 # setting the server
 server <- function(input, output, session) {
+  observeEvent(input$tabs, {
+    if(input$tabs=='t2'){
+      shinyalert("Welcome to GD-CAT(Mouse)!", 
+                 "If the page becomes unresponsive following a user action, it is likely a result of high website traffic. We kindly request your patience, as you are queued next in line.", 
+                 type = "success")
+    }
+  })
   working_dataset<-eventReactive(input$import,{
     
     isolate({
@@ -592,7 +599,7 @@ server <- function(input, output, session) {
       progress$set(value = 3)
       output$dotp <- downloadHandler(
         filename = function() {
-          paste("GSEA Pathway-",origin_gene_tissue,"-", input$diet," diet-",  Sys.Date(), ".pdf", sep="")
+          paste("GSEA Pathway-",origin_gene_tissue,' in ', select_tissue, ' ', input$diet," diet-",  Sys.Date(), ".pdf", sep="")
         },
         content = function(file) {
           pdf(file, width = 10, height = 10)
@@ -609,7 +616,7 @@ server <- function(input, output, session) {
       progress$set(value = 4)
       output$ed <- downloadHandler(
         filename = function() {
-          paste("GSEA Network-", origin_gene_tissue,"-", input$diet," diet-", Sys.Date(), ".pdf", sep="")
+          paste("GSEA Network-", origin_gene_tissue,' in ', select_tissue, ' ', input$diet," diet-", Sys.Date(), ".pdf", sep="")
         },
         content = function(file) {
           pdf(file, width = 10, height = 10)
@@ -779,11 +786,7 @@ server <- function(input, output, session) {
       showNotification("Click the legend (on the right of the chart body) of the Pie chart to toggle the display of the series.",duration = NULL,type="message")
     }
   })
-  observeEvent(input$tabs, {
-    if(input$tabs=='t2'){
-      shinyalert("Welcome to GD-CAT(Mouse)!", "If the page becomes unresponsive following a user action, it is likely a result of high website traffic. We kindly request your patience, as you are queued next in line.", type = "info")
-    }
-  })
+  
 }
 
 #run the app

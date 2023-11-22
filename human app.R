@@ -70,7 +70,7 @@ t2<-function(){
               width = 12,
               sliderInput(inputId = "tp",label = "How many top pathways you want to see",value = 15, min = 1, max = 20),
               actionButton('dotb', class = "btn-primary", 'Start process'),
-              plotOutput('dot',width  = "1200px",height = "900px"),
+              plotOutput('dot',width  = "800px",height = "900px"),
               downloadButton("dotp", "Download Image"),
               plotOutput('nete',width  = "1200px",height = "900px"),
               downloadButton("ed", "Download Image")
@@ -148,6 +148,13 @@ ui<-dashboardPage(header(), sidebar(), body())
 
 # setting the server
 server <- function(input, output, session) {
+  observeEvent(input$tabs, {
+    if(input$tabs=='t2'){
+      shinyalert("Welcome to GD-CAT(Human)!", 
+                 "If the page becomes unresponsive following a user action, it is likely a result of high website traffic. We'd appreciate your patience, as you are queued next in line.", 
+                 type = "success")
+    }
+  })
   working_dataset<-eventReactive(input$import,{
     
     isolate({
@@ -161,7 +168,7 @@ server <- function(input, output, session) {
       working_dataset
     })
   })
-  plan(multisession)
+  
   
   sig_table<-eventReactive(input$import,{
     progress <- Progress$new(session, min=0, max=5)
@@ -175,55 +182,53 @@ server <- function(input, output, session) {
       origin_gene_tissue = paste0(origin_gene, '_', origin_tissue)
       working_dataset<-working_dataset()
     })
-    promise<-future({
-      tissue2 <- working_dataset[,grepl('Adipose - Subcutaneous', colnames(working_dataset)) | grepl('Adipose - Visceral (Omentum)', colnames(working_dataset), fixed=T) | grepl('Brain - Hypothalamus', colnames(working_dataset)) | grepl('Brain - Hippocampus', colnames(working_dataset)) | grepl('Small Intestine - Terminal Ileum', colnames(working_dataset), fixed=T) | grepl('Stomach', colnames(working_dataset), fixed=T) | grepl('Thyroid', colnames(working_dataset), fixed=T) | grepl('Pancreas', colnames(working_dataset), fixed=T) | grepl('Spleen', colnames(working_dataset), fixed=T) | grepl('Muscle - Skeletal', colnames(working_dataset), fixed=T) | grepl('Pituitary', colnames(working_dataset), fixed=T) | grepl('Artery - Coronary', colnames(working_dataset), fixed=T) | grepl('Liver', colnames(working_dataset), fixed=T) | grepl('Kidney - Cortex', colnames(working_dataset), fixed=T) | grepl('Heart - Left Ventricle', colnames(working_dataset), fixed=T) | grepl('Colon - Transverse', colnames(working_dataset), fixed=T) | grepl('Colon - Sigmoid', colnames(working_dataset), fixed=T) | grepl('Adrenal Gland', colnames(working_dataset), fixed=T) |  grepl('Artery - Aorta', colnames(working_dataset), fixed=T),]
+    
+    tissue2 <- working_dataset[,grepl('Adipose - Subcutaneous', colnames(working_dataset)) | grepl('Adipose - Visceral (Omentum)', colnames(working_dataset), fixed=T) | grepl('Brain - Hypothalamus', colnames(working_dataset)) | grepl('Brain - Hippocampus', colnames(working_dataset)) | grepl('Small Intestine - Terminal Ileum', colnames(working_dataset), fixed=T) | grepl('Stomach', colnames(working_dataset), fixed=T) | grepl('Thyroid', colnames(working_dataset), fixed=T) | grepl('Pancreas', colnames(working_dataset), fixed=T) | grepl('Spleen', colnames(working_dataset), fixed=T) | grepl('Muscle - Skeletal', colnames(working_dataset), fixed=T) | grepl('Pituitary', colnames(working_dataset), fixed=T) | grepl('Artery - Coronary', colnames(working_dataset), fixed=T) | grepl('Liver', colnames(working_dataset), fixed=T) | grepl('Kidney - Cortex', colnames(working_dataset), fixed=T) | grepl('Heart - Left Ventricle', colnames(working_dataset), fixed=T) | grepl('Colon - Transverse', colnames(working_dataset), fixed=T) | grepl('Colon - Sigmoid', colnames(working_dataset), fixed=T) | grepl('Adrenal Gland', colnames(working_dataset), fixed=T) |  grepl('Artery - Aorta', colnames(working_dataset), fixed=T),]
       
-      tissue1 <- working_dataset[,colnames(working_dataset) %in% origin_gene_tissue]
+    tissue1 <- working_dataset[,colnames(working_dataset) %in% origin_gene_tissue]
       
       #tissue1 = tissue1[row.names(tissue1) %in% row.names(tissue2),]
       #tissue2 = tissue2[row.names(tissue2) %in% row.names(tissue1),]
 
-      tryCatch({
-        full_cors = bicorAndPvalue(tissue1, tissue2, use = 'p')
-      }, error = function(e) {
-        shinyalert("Oops!","Please check that you input the official NBCI gene symbol; another reason may be that no such gene is available in the dataset.", type = "error")
-      })
-      
-      
-      cor_table = reshape2::melt(full_cors$bicor)
-      new_p = reshape2::melt(full_cors$p)
-      
-      colnames(cor_table) = c('gene_tissue_1', 'gene_tissue_2', 'bicor')
-      #can drop here to clear CPU
-      full_cors=NULL
-      
-      cor_table$pvalue = signif(new_p$value, 3)
-      cor_table$bicor = round(cor_table$bicor, 3)
-      cor_table = cor_table[!cor_table$gene_tissue_1==cor_table$gene_tissue_2,]
-      cor_table$qvalue = signif(p.adjust(cor_table$pvalue, "BH"), 3)
-      cor_table = cor_table[order(cor_table$qvalue, decreasing=F),]
-      cor_table = na.omit(cor_table)
-      cor_table$gene_symbol_1 = gsub("\\_.*","",cor_table$gene_tissue_1)
-      cor_table$tissue_1 = gsub(".*_","",cor_table$gene_tissue_1)
-      cor_table = cor_table[!is.na(cor_table$tissue_1),]
-      
-      cor_table$gene_symbol_2 = gsub("\\_.*","",cor_table$gene_tissue_2)
-      cor_table$tissue_2 = gsub(".*_","",cor_table$gene_tissue_2)
-      cor_table = cor_table[!is.na(cor_table$tissue_2),]
-      
-      #sig_table åé¢éè¦ç¨å°
-      sig_table = cor_table[cor_table$qvalue<0.1,]
-      sig_table$qcat =ifelse(sig_table$qvalue<0.01, 'q<0.01', 'q<0.1')
-      sig_table$qcat =ifelse(sig_table$qvalue<0.001, 'q<0.001', paste0(sig_table$qcat))
-      
-      return(sig_table)
+    tryCatch({
+      full_cors = bicorAndPvalue(tissue1, tissue2, use = 'p')
+    }, error = function(e) {
+      shinyalert("Oops!","Please check that you input the official NBCI gene symbol; another reason may be that no such gene is available in the dataset.", type = "error")
     })
+      
     progress$set(value = 2)
-    # Execute the promise and retrieve the result using future's value()
-    sig_table <- future::value(promise)
+    cor_table = reshape2::melt(full_cors$bicor)
+    new_p = reshape2::melt(full_cors$p)
+      
+    colnames(cor_table) = c('gene_tissue_1', 'gene_tissue_2', 'bicor')
+    #can drop here to clear CPU
+    full_cors=NULL
     progress$set(value = 3)
-    # Return the result
-    return(sig_table)
+    cor_table$pvalue = signif(new_p$value, 3)
+    cor_table$bicor = round(cor_table$bicor, 3)
+    cor_table = cor_table[!cor_table$gene_tissue_1==cor_table$gene_tissue_2,]
+    cor_table$qvalue = signif(p.adjust(cor_table$pvalue, "BH"), 3)
+    cor_table = cor_table[order(cor_table$qvalue, decreasing=F),]
+    cor_table = na.omit(cor_table)
+    cor_table$gene_symbol_1 = gsub("\\_.*","",cor_table$gene_tissue_1)
+    cor_table$tissue_1 = gsub(".*_","",cor_table$gene_tissue_1)
+    cor_table = cor_table[!is.na(cor_table$tissue_1),]
+      
+    cor_table$gene_symbol_2 = gsub("\\_.*","",cor_table$gene_tissue_2)
+    cor_table$tissue_2 = gsub(".*_","",cor_table$gene_tissue_2)
+    cor_table = cor_table[!is.na(cor_table$tissue_2),]
+      
+    #sig_table åé¢éè¦ç¨å°
+    sig_table = cor_table[cor_table$qvalue<0.1,]
+    sig_table$qcat =ifelse(sig_table$qvalue<0.01, 'q<0.01', 'q<0.1')
+    sig_table$qcat =ifelse(sig_table$qvalue<0.001, 'q<0.001', paste0(sig_table$qcat))
+      
+    progress$set(value = 4)
+    
+    
+    
+    sig_table
+    
   })
   tryCatch({
     col_scheme<-reactive({
@@ -435,40 +440,38 @@ server <- function(input, output, session) {
     origin_gene_tissue = paste0(origin_gene, '_', origin_tissue)
     col_scheme<- col_scheme()
     progress$set(value = 2)
-    promise<-future({
-      origin_pull = sig_table[sig_table$tissue_2==origin_tissue,]
-      orig_network_genes = as.vector(origin_pull$gene_tissue_2[1:number_orig_gene])
-      peripheral_pull = sig_table[!sig_table$tissue_2==origin_tissue,]
-      periph_network_genes = as.vector(peripheral_pull$gene_tissue_2[1:number_peripheral_genes])
-      sql_pull_list = c(origin_gene_tissue, orig_network_genes, periph_network_genes)
+    
+    origin_pull = sig_table[sig_table$tissue_2==origin_tissue,]
+    orig_network_genes = as.vector(origin_pull$gene_tissue_2[1:number_orig_gene])
+    peripheral_pull = sig_table[!sig_table$tissue_2==origin_tissue,]
+    periph_network_genes = as.vector(peripheral_pull$gene_tissue_2[1:number_peripheral_genes])
+    sql_pull_list = c(origin_gene_tissue, orig_network_genes, periph_network_genes)
       
       
       
-      tissue1 <- working_dataset[, colnames(working_dataset)  %in% sql_pull_list]
-      full_cors = bicorAndPvalue(tissue1, tissue1, use = 'p')
-      cor_table = reshape2::melt(full_cors$bicor)
-      new_p = reshape2::melt(full_cors$p)
-      colnames(cor_table) = c('gene_tissue_1', 'gene_tissue_2', 'bicor')
+    tissue1 <- working_dataset[, colnames(working_dataset)  %in% sql_pull_list]
+    full_cors = bicorAndPvalue(tissue1, tissue1, use = 'p')
+    cor_table = reshape2::melt(full_cors$bicor)
+    new_p = reshape2::melt(full_cors$p)
+    colnames(cor_table) = c('gene_tissue_1', 'gene_tissue_2', 'bicor')
       
       
       #can drop here to clear CPU
-      full_cors=NULL
-      cor_table$pvalue = signif(new_p$value, 3)
-      cor_table$bicor = round(cor_table$bicor, 3)
-      cor_table = cor_table[!cor_table$gene_tissue_1==cor_table$gene_tissue_2,]
-      cor_table$qvalue = signif(p.adjust(cor_table$pvalue, "BH"), 3)
-      cor_table = cor_table[order(cor_table$qvalue, decreasing=F),]
-      cor_table = na.omit(cor_table)
-      cor_table$gene_symbol_1 = gsub("\\_.*","",cor_table$gene_tissue_1)
-      cor_table$tissue_1 = gsub(".*_","",cor_table$gene_tissue_1)
-      cor_table = cor_table[!is.na(cor_table$tissue_1),]
-      cor_table$gene_symbol_2 = gsub("\\_.*","",cor_table$gene_tissue_2)
-      cor_table$tissue_2 = gsub(".*_","",cor_table$gene_tissue_2)
-      cor_table = cor_table[!is.na(cor_table$tissue_2),]
-      sql_pull_2 = cor_table
-      return(sql_pull_2)
-    })
-    sql_pull_2<-future::value(promise)
+    full_cors=NULL
+    cor_table$pvalue = signif(new_p$value, 3)
+    cor_table$bicor = round(cor_table$bicor, 3)
+    cor_table = cor_table[!cor_table$gene_tissue_1==cor_table$gene_tissue_2,]
+    cor_table$qvalue = signif(p.adjust(cor_table$pvalue, "BH"), 3)
+    cor_table = cor_table[order(cor_table$qvalue, decreasing=F),]
+    cor_table = na.omit(cor_table)
+    cor_table$gene_symbol_1 = gsub("\\_.*","",cor_table$gene_tissue_1)
+    cor_table$tissue_1 = gsub(".*_","",cor_table$gene_tissue_1)
+    cor_table = cor_table[!is.na(cor_table$tissue_1),]
+    cor_table$gene_symbol_2 = gsub("\\_.*","",cor_table$gene_tissue_2)
+    cor_table$tissue_2 = gsub(".*_","",cor_table$gene_tissue_2)
+    cor_table = cor_table[!is.na(cor_table$tissue_2),]
+    sql_pull_2 = cor_table
+      
     
     progress$set(value = 3)
     ######################################
@@ -596,27 +599,25 @@ server <- function(input, output, session) {
       #Next we need to order the fold changes in decreasing order. To do this we'll use the sort() function, which takes a vector as input. This is in contrast to Tidyverse's arrange(), which requires a data frame.
         
       ## Sort fold changes in decreasing order
-        fc_dko <- sort(fc_dko, decreasing = TRUE)
+      fc_dko <- sort(fc_dko, decreasing = TRUE)
         
-        organism = "org.Hs.eg.db"
+      organism = "org.Hs.eg.db"
         
         ## Org.Hs.eg.db https://bioconductor.org/packages/release/data/annotation/html/org.Hs.eg.db.html
-        promise<-future({
-          gse <-gseGO(
-          geneList=fc_dko,
-          ont = "ALL",
-          OrgDb= organism,
-          keyType = "SYMBOL",
-          exponent = 1,
-          minGSSize = 2,
-          maxGSSize = 500,
-          eps = 0,
-          pvalueCutoff = 1,
-          pAdjustMethod = "BH") 
-        str(gse)
-        return(gse)
-        })
-      gse<-future::value(promise)
+        
+      gse <-gseGO(
+        geneList=fc_dko,
+        ont = "ALL",
+        OrgDb= organism,
+        keyType = "SYMBOL",
+        exponent = 1,
+        minGSSize = 2,
+        maxGSSize = 500,
+        eps = 0,
+        pvalueCutoff = 1,
+        pAdjustMethod = "BH") 
+      str(gse)
+        
       progress$set(value = 4)
       isolate({
         origin_gene<-input$origin_gene
@@ -632,7 +633,7 @@ server <- function(input, output, session) {
       
       output$dotp <- downloadHandler(
         filename = function() {
-          paste("GSEA Pathway-",origin_gene_tissue,"-", input$Gender,"-", Sys.Date(), ".pdf", sep="")
+          paste("GSEA Pathway-",origin_gene_tissue,' in ', select_tissue, ' ', input$Gender,"-", Sys.Date(), ".pdf", sep="")
         },
         content = function(file) {
           pdf(file, width = 10, height = 10)
@@ -649,7 +650,7 @@ server <- function(input, output, session) {
       progress$set(value = 5)
       output$ed <- downloadHandler(
         filename = function() {
-          paste("GSEA Network-",origin_gene_tissue,"-", input$Gender,"-", Sys.Date(), ".pdf", sep="")
+          paste("GSEA Network-",origin_gene_tissue,' in ', select_tissue, ' ', input$Gender,"-", Sys.Date(), ".pdf", sep="")
         },
         content = function(file) {
           pdf(file, width = 10, height = 10)
@@ -819,11 +820,7 @@ server <- function(input, output, session) {
       showNotification("Click the legend (on the right of the chart body) of the Pie chart to toggle the display of the series.",duration = NULL,type="message")
     }
   })
-  observeEvent(input$tabs, {
-    if(input$tabs=='t2'){
-      shinyalert("Welcome to GD-CAT(Human)!", "If the page becomes unresponsive following a user action, it is likely a result of high website traffic. We kindly request your patience, as you are queued next in line.", type = "info")
-    }
-  })
+  
 }
 
 #run the app
