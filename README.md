@@ -4,6 +4,7 @@ Genetically-derived correlations across tissues, or `GD-CAT`is a shiny-based end
 You can select the gene and tissue combination that interests you, and have a look at the demographic characteristics from the cohort of choice.
 and then do the enrichment, scatter plot, single cell and network visualization.  <br><br>
 You can access our app now via [GD-CAT](https://pipeline.biochem.uci.edu/gtex/). <br><br>
+You can run it on your device too. Only need to run "human app.R" or "mouse app.R" from the [drive folder](https://drive.google.com/drive/folders/1KvzT_USvOXiXbktSs-e3DCzwrqsfZDEl?usp=sharing).<br><br>
 Now the [paper](https://pubmed.ncbi.nlm.nih.gov/37214953/) is preprinted. <br><br>
 ## Tutorial 
 > [!NOTE]
