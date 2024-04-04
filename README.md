@@ -1,10 +1,10 @@
 # GD-CAT
-Genetically-derived correlations across tissues, or [GD-CAT](https://pipeline.biochem.uci.edu/gtex/) is a shiny-based endocrine genetic web app for tissue cross-talking. Now we have both human data in sex from [GTEx](https://gtexportal.org/home/) and mouse data in diets from [HMDP](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4878195/). <br><br>
-![initial](https://github.com/mingqizh/GD-CAT/blob/main/images/pipeline.png) Now the paper [Leveraging inter-individual transcriptional correlation structure to infer discrete signaling mechanisms across metabolic tissues](https://elifesciences.org/articles/88863) has been published on eLife. <br><br>
+Genetically-derived correlations across tissues, or [GD-CAT](https://pipeline.biochem.uci.edu/gtex/) is a shiny-based endocrine genetic web app for tissue cross-talking. Now we have both human data in sex from [GTEx](https://gtexportal.org/home/) and mouse data in diets from [HMDP](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4878195/). Now the paper [Leveraging inter-individual transcriptional correlation structure to infer discrete signaling mechanisms across metabolic tissues](https://elifesciences.org/articles/88863) has been published on eLife. <br><br>
+![initial](https://github.com/mingqizh/GD-CAT/blob/main/images/pipeline.png)  <br><br>
 First, select the gene and tissue combination of interest, and have a look at the demographic characteristics from the cohort of choice.
 and then do the enrichment, scatter plot, single cell and network visualization.  <br><br>
 It can also be run on your own device too. Only need to run "human app.R" or "mouse app.R" from the [drive folder](https://drive.google.com/drive/folders/1KvzT_USvOXiXbktSs-e3DCzwrqsfZDEl?usp=sharing).<br><br>
-You are encouraged to cite [Leveraging inter-individual transcriptional correlation structure to infer discrete signaling mechanisms across metabolic tissues](https://elifesciences.org/articles/88863) if you find it useful for your research. <br><br>
+You are encouraged to cite [the eLife paper](https://elifesciences.org/articles/88863) if you find it useful for your research. <br><br>
 ## Tutorial 
 > [!NOTE]
 > For mouse data is pretty much the same pipeline to use, just a few different. And be awarded that the color of the headboard for the mouse is green and the human one will be blue. 
