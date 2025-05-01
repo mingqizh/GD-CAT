@@ -517,12 +517,28 @@ server <- function(input, output, session) {
   output$table.t1 <- renderDT(
     table1(),
     extensions = 'Buttons',
-    options = list(dom = 'Blfrtip',
-                   scrollX=TRUE,
-                   autoWidth=FALSE,
-                   buttons = c('copy','csv','excel'),
-                   lengthMenu = list(c(10,25,50),
-                                     c(10,25,50,"All")) ))
+    options = list(
+      dom = 'Blfrtip',
+      scrollX = TRUE,
+      autoWidth = FALSE,
+      buttons = list(
+        list(
+          extend = 'copy',
+          exportOptions = list(modifier = list(page = 'all'))
+        ),
+        list(
+          extend = 'csv',
+          exportOptions = list(modifier = list(page = 'all'))
+        ),
+        list(
+          extend = 'excel',
+          exportOptions = list(modifier = list(page = 'all'))
+        )
+      ),
+      lengthMenu = list(c(10, 25, 50, -1), c(10, 25, 50, "All"))
+    ),
+    server = FALSE
+  )
   observeEvent(input$dotb,{
     if(!is.null(input$selected_tissue)){
       progress <- Progress$new(session, min=0, max=5)
